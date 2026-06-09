@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grocery Counter</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header class="main-navbar">
+        <div class="navbar-brand">Helen's Store</div>
+        <nav class="pos-navbar">
+            <button id="nav-pos" class="nav-tab active">
+                <svg viewBox="0 0 24 24" class="nav-icon">
+                    <path
+                        d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" />
+                </svg>
+                Cart
+            </button>
+            <button id="nav-inventory" class="nav-tab">
+                <svg viewBox="0 0 24 24" class="nav-icon">
+                    <path
+                        d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z" />
+                </svg>
+                Inventory
+            </button>
+            <button id="nav-dashboard" class="nav-tab">
+                <svg viewBox="0 0 24 24" class="nav-icon">
+                    <path
+                        d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
+                </svg>
+                Sales Chart
+            </button>
+        </nav>
+    </header>
+
+    <!-- Hidden but auto-focused input to capture scanner input -->
+    <input type="text" id="barcode-input" autocomplete="off" autofocus />
+
+    <div id="pos-view" class="view-section">
+        <div class="app-container">
+            <!-- Main POS Area -->
+            <main class="pos-main">
+                <header class="pos-header">
+                    <h1>Helen's Store</h1>
+                </header>
+
+                <!-- Error Banner -->
+                <div id="error-banner" class="error-banner hidden">
+                    <span class="error-icon">⚠️</span>
+                    <span id="error-message">Item Not Found: Please scan again or enter manually.</span>
+                </div>
+
+                <div class="cart-container">
+                    <table class="cart-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Price</th>
+                                <th>Subtotal</th>
+                                <th style="width: 60px; text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cart-body">
+                            <!-- Cart items will be injected here -->
+                        </tbody>
+                    </table>
+                    <div id="empty-cart-message" class="empty-cart">
+                        <p>Cart is empty. Scan an item to begin.</p>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Sidebar / Checkout Area -->
+            <aside class="pos-sidebar">
+                <div class="summary-card">
+                    <h2>Transaction Summary</h2>
+
+                    <div class="summary-row">
+                        <span>Subtotal</span>
+                        <span id="summary-subtotal">₱0.00</span>
+                    </div>
+                    <div class="summary-row total-row">
+                        <span>Total</span>
+                        <span id="summary-total">₱0.00</span>
+                    </div>
+
+                    <div class="payment-section">
+                        <div class="summary-row payment-row">
+                            <label for="amount-tendered" class="payment-label">Amount Tendered</label>
+                            <div class="tendered-input-wrapper">
+                                <span class="price-prefix">₱</span>
+                                <input type="number" id="amount-tendered" min="0" step="0.01" placeholder="0.00" disabled>
+                            </div>
+                        </div>
+                        <div class="summary-row change-row">
+                            <span>Change</span>
+                            <span id="summary-change" class="change-amount">₱0.00</span>
+                        </div>
+                    </div>
+
+                    <button id="checkout-btn" class="checkout-btn" disabled>
+                        Complete Checkout
+                    </button>
+                </div>
+
+                <!-- Camera Scanner Card -->
+                <div class="camera-scanner-card">
+                    <h3>Barcode Scanner</h3>
+                    <div id="scanner-container">
+                        <div id="reader"></div>
+                        <button id="toggle-scanner-btn" class="scanner-btn">Start Camera Scanner</button>
+                    </div>
+                </div>
+
+                <!-- Manual Entry (Fallback for unreadable barcodes) -->
+                <div class="manual-entry-card">
+                    <h3>Search Items</h3>
+                    <div class="manual-input-group">
+                        <input type="text" id="manual-barcode" placeholder="Enter barcode...">
+                        <button id="manual-add-btn">Add</button>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div> <!-- Close #pos-view -->
+
+    <!-- Inventory Section -->
+    <div id="inventory-view" class="view-section hidden">
+        <div class="inventory-container">
+            <div class="inventory-card">
+                <header class="inventory-header">
+                    <div class="header-title-group">
+                        <h2>Product Inventory</h2>
+                        <span id="inventory-count-badge" class="count-badge">0 Products</span>
+                    </div>
+                    <button id="add-product-btn" class="add-btn">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        </svg>
+                        Add New Product
+                    </button>
+                </header>
+
+                <!-- Search and Filter Bar -->
+                <div class="inventory-filter-bar">
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" class="search-icon">
+                            <path
+                                d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                        </svg>
+                        <input type="text" id="inventory-search" placeholder="Search by name or barcode..."
+                            autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="inventory-table-wrapper">
+                    <table class="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Barcode</th>
+                                <th>Product Name</th>
+                                <th>Unit Price</th>
+                                <th style="width: 150px; text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-body">
+                            <!-- Loaded database products injected here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="empty-inventory-message" class="empty-inventory hidden">
+                    <p>No products found in the database. Click 'Add New Product' to begin!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div id="dashboard-view" class="view-section hidden">
+        <div class="dashboard-container">
+            <!-- KPIs Grid -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <span class="kpi-label">Today's Sales</span>
+                    <span id="kpi-today" class="kpi-value">₱0.00</span>
+                    <span class="kpi-subtext">Real-time daily total</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">This Week</span>
+                    <span id="kpi-week" class="kpi-value">₱0.00</span>
+                    <span class="kpi-subtext">Starting Sunday</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">This Month</span>
+                    <span id="kpi-month" class="kpi-value">₱0.00</span>
+                    <span class="kpi-subtext">Current calendar month</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">This Year</span>
+                    <span id="kpi-year" class="kpi-value">₱0.00</span>
+                    <span class="kpi-subtext">Annual cumulative total</span>
+                </div>
+            </div>
+
+            <!-- Chart and Popular items row -->
+            <div class="dashboard-analytics-row">
+                <!-- Line Chart Card -->
+                <div class="analytics-card chart-card">
+                    <h3>Sales Trend (Last 7 Days)</h3>
+                    <div class="chart-container-inner" style="position: relative; height: 320px; width: 100%;">
+                        <canvas id="sales-chart-canvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Popular Items Card -->
+                <div class="analytics-card popular-card">
+                    <h3>Most Popular Items</h3>
+                    <div class="popular-table-wrapper">
+                        <table class="popular-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Qty Sold</th>
+                                    <th>Total Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody id="popular-items-body">
+                                <!-- Loaded analytics top products injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="empty-popular-message" class="empty-popular hidden">
+                        <p>No sales recorded yet. Start scanning to populate statistics!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Add/Edit Modal -->
+    <div id="product-modal" class="modal hidden">
+        <div class="modal-content product-modal-content">
+            <header class="modal-header">
+                <h2 id="product-modal-title">Add New Product</h2>
+                <button id="close-product-modal-btn" class="modal-close-x">&times;</button>
+            </header>
+            <form id="product-form" autocomplete="off">
+                <input type="hidden" id="form-product-id">
+
+                <div class="form-group">
+                    <label for="form-product-barcode">Barcode / Scan Code</label>
+                    <div class="input-with-button">
+                        <input type="text" id="form-product-barcode" required
+                            placeholder="Scan barcode or enter manually...">
+                        <button type="button" id="form-gen-barcode" title="Generate Random Barcode">
+                            <svg viewBox="0 0 24 24">
+                                <path
+                                    d="M19 8H5v10h14V8zm2-4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM9 16H7v-6h2v6zm4 0h-2v-6h2v6zm4 0h-2v-6h2v6z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="form-product-name">Product Name</label>
+                    <input type="text" id="form-product-name" required placeholder="e.g. Orange Juice, Potato Chips...">
+                </div>
+
+                <div class="form-group">
+                    <label for="form-product-price">Price (₱)</label>
+                    <div class="price-input-wrapper">
+                        <span class="price-prefix">₱</span>
+                        <input type="number" id="form-product-price" step="0.01" min="0.01" required placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="modal-form-actions">
+                    <button type="button" id="cancel-product-btn" class="modal-btn cancel-btn">Cancel</button>
+                    <button type="submit" id="save-product-btn" class="modal-btn save-btn">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div id="receipt-modal" class="modal hidden">
+        <div class="modal-content" style="position: relative;">
+            <button id="cancel-receipt-btn" class="modal-close-x" style="position: absolute; top: 1rem; right: 1rem;"
+                title="Go back / Add items">&times;</button>
+            <div class="receipt">
+                <h2>Receipt</h2>
+                <div id="receipt-items"></div>
+                <div class="receipt-totals">
+                    <div class="receipt-row"><span>Total:</span> <span id="receipt-total"></span></div>
+                    <div class="receipt-row receipt-sub-row"><span>Amount Tendered:</span> <span id="receipt-tendered">₱0.00</span></div>
+                    <div class="receipt-row receipt-sub-row"><span>Change:</span> <span id="receipt-change">₱0.00</span></div>
+                </div>
+                <button id="close-receipt-btn" class="close-btn">New Transaction!</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
