@@ -1136,3 +1136,8 @@ body {
     color: #4b5563; /* Slate 600 */
     margin-top: 0.25rem;
 }
+
+@media (max-width: 760px) { .main-navbar { padding: 1rem; flex-wrap: wrap; gap: 1rem; } .pos-navbar { flex-wrap: wrap; } .nav-tab { padding: .5rem; } .app-container { flex-direction: column; padding: 1rem; } .pos-sidebar { width: 100%; } .pos-main { min-width: 0; } .cart-container { overflow-x: auto; min-height: 260px; } .inventory-container, .dashboard-container { padding: 1rem; } .inventory-card { padding: 1rem; } }
+.modal-content { max-height: 90vh; overflow-y: auto; }
+
+[hidden] { display: none !important; }

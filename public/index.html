@@ -12,7 +12,7 @@
 <body>
     <header class="main-navbar">
         <div class="navbar-brand">Helen's Store</div>
-        <nav class="pos-navbar">
+        <nav class="pos-navbar"><button id="logout-btn" class="nav-tab">Sign out</button>
             <button id="nav-pos" class="nav-tab active">
                 <svg viewBox="0 0 24 24" class="nav-icon">
                     <path
@@ -27,7 +27,7 @@
                 </svg>
                 Inventory
             </button>
-            <button id="nav-dashboard" class="nav-tab">
+            <button hidden id="nav-dashboard" class="nav-tab">
                 <svg viewBox="0 0 24 24" class="nav-icon">
                     <path
                         d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
@@ -38,7 +38,7 @@
     </header>
 
     <!-- Hidden but auto-focused input to capture scanner input -->
-    <input type="text" id="barcode-input" autocomplete="off" autofocus />
+    <input type="text" aria-label="Barcode scanner input" id="barcode-input" autocomplete="off" autofocus />
 
     <div id="pos-view" class="view-section">
         <div class="app-container">
@@ -49,7 +49,7 @@
                 </header>
 
                 <!-- Error Banner -->
-                <div id="error-banner" class="error-banner hidden">
+                <div role="alert" id="error-banner" class="error-banner hidden">
                     <span class="error-icon">⚠️</span>
                     <span id="error-message">Item Not Found: Please scan again or enter manually.</span>
                 </div>
@@ -138,7 +138,7 @@
                         <h2>Product Inventory</h2>
                         <span id="inventory-count-badge" class="count-badge">0 Products</span>
                     </div>
-                    <button id="add-product-btn" class="add-btn">
+                    <button hidden id="add-product-btn" class="add-btn">
                         <svg viewBox="0 0 24 24">
                             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
                         </svg>
@@ -276,7 +276,7 @@
                     <label for="form-product-price">Price (₱)</label>
                     <div class="price-input-wrapper">
                         <span class="price-prefix">₱</span>
-                        <input type="number" id="form-product-price" step="0.01" min="0.01" required placeholder="0.00">
+                        <input type="number" id="form-product-price" step="0.01" min="0" required placeholder="0.00">
                     </div>
                 </div>
 
@@ -292,7 +292,7 @@
     <div id="receipt-modal" class="modal hidden">
         <div class="modal-content" style="position: relative;">
             <button id="cancel-receipt-btn" class="modal-close-x" style="position: absolute; top: 1rem; right: 1rem;"
-                title="Go back / Add items">&times;</button>
+                title="Close completed receipt">&times;</button>
             <div class="receipt">
                 <h2>Receipt</h2>
                 <div id="receipt-items"></div>
@@ -306,8 +306,8 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
     <script src="app.js"></script>
 </body>
 
