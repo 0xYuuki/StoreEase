@@ -26,6 +26,22 @@ module.exports = (db) => ({
     db.prepare("UPDATE Products SET active=0 WHERE id=? AND active=1").run(id),
   saleByKey: (key) =>
     db.prepare("SELECT * FROM Sales WHERE idempotency_key=?").get(key),
+  sale: (id) => db.prepare(
+    "SELECT id, strftime('%Y-%m-%dT%H:%M:%fZ', timestamp) AS timestamp, total_amount FROM Sales WHERE id=?",
+  ).get(id),
+  sales: (from, until, offset) => db.prepare(`
+    SELECT id, strftime('%Y-%m-%dT%H:%M:%fZ', timestamp) AS timestamp, total_amount FROM Sales
+    WHERE julianday(Sales.timestamp) >= julianday(?) AND julianday(Sales.timestamp) < julianday(?)
+    ORDER BY julianday(Sales.timestamp) DESC, id DESC LIMIT 26 OFFSET ?
+  `).all(from, until, offset),
+  setReorderLevel: (id, level) => db.prepare(
+    "UPDATE Products SET reorder_level=? WHERE id=? AND active=1 AND stock IS NOT NULL",
+  ).run(level, id).changes,
+  history: (id, offset) => db.prepare(`
+    SELECT id, strftime('%Y-%m-%dT%H:%M:%fZ', timestamp) AS timestamp, delta, resulting_stock, reason, sale_id
+    FROM StockAdjustments WHERE product_id=? ORDER BY id DESC LIMIT 26 OFFSET ?
+  `).all(id, offset),
+  hasProduct: (id) => db.prepare("SELECT 1 FROM Products WHERE id=?").get(id),
   receipt: (id) => ({
     success: true,
     sale_id: id,
@@ -52,10 +68,10 @@ module.exports = (db) => ({
         "INSERT INTO SaleItems(sale_id,product_id,quantity,price,product_name,barcode_string,line_total) VALUES(?,?,?,?,?,?,?)",
       )
       .run(sale, p.id, qty, p.price, p.name, p.barcode_string, line),
-  stock: (id, value, delta, reason) => {
+  stock: (id, value, delta, reason, sale = null) => {
     db.prepare("UPDATE Products SET stock=? WHERE id=?").run(value, id);
     db.prepare(
-      "INSERT INTO StockAdjustments(product_id,delta,resulting_stock,reason) VALUES(?,?,?,?)",
-    ).run(id, delta, value, reason);
+      "INSERT INTO StockAdjustments(product_id,delta,resulting_stock,reason,sale_id) VALUES(?,?,?,?,?)",
+    ).run(id, delta, value, reason, sale);
   },
 });

@@ -2,6 +2,21 @@
 const { createHash } = require("node:crypto");
 const v = require("../utils/validation");
 const { transaction } = require("../db/connection");
+function manilaMidnight(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))
+    v.fail("Use a date in YYYY-MM-DD format");
+  const date = new Date(value + "T00:00:00Z");
+  if (!Number.isFinite(+date) || date.toISOString().slice(0, 10) !== value)
+    v.fail("Invalid calendar date");
+  return +date - 8 * 3600000;
+}
+function pageOf(rows) {
+  return { entries: rows.slice(0, 25), has_more: rows.length > 25 };
+}
+function pageOffset(page = "1") {
+  const offset = (v.id(page) - 1) * 25;
+  return v.integer(offset, "page offset", 0);
+}
 module.exports = (db) => {
   const repo = require("../db/repository")(db);
   const find = (id) => {
@@ -11,6 +26,36 @@ module.exports = (db) => {
   };
   return {
     list: repo.list,
+    sales({ from, to, page }) {
+      const start = manilaMidnight(from);
+      const end = manilaMidnight(to);
+      if (end < start) v.fail("End date must follow start date");
+      return pageOf(repo.sales(
+        new Date(start).toISOString(),
+        new Date(end + 86400000).toISOString(),
+        pageOffset(page),
+      ));
+    },
+    receipt(raw) {
+      const id = v.id(raw);
+      const sale = repo.sale(id);
+      if (!sale) throw new v.ApiError(404, "Receipt not found");
+      return { ...repo.receipt(id), timestamp: sale.timestamp };
+    },
+    reorder(raw, body) {
+      const id = v.id(raw);
+      find(id);
+      const level = body.reorder_level === null ? null :
+        v.integer(body.reorder_level, "reorder level", 0);
+      if (!repo.setReorderLevel(id, level))
+        throw new v.ApiError(409, "Enable stock tracking first");
+      return find(id);
+    },
+    stockHistory(raw, page) {
+      const id = v.id(raw);
+      if (!repo.hasProduct(id)) throw new v.ApiError(404, "Product not found");
+      return pageOf(repo.history(id, pageOffset(page)));
+    },
     lookup(code) {
       const p = repo.barcode(v.text(code, "barcode", 128));
       if (!p) throw new v.ApiError(404, "Item not found");
@@ -96,7 +141,7 @@ module.exports = (db) => {
         for (const { p, quantity, line } of lines) {
           repo.insertItem(sale, p, quantity, line);
           if (p.stock !== null)
-            repo.stock(p.id, p.stock - quantity, -quantity, `Sale ${sale}`);
+            repo.stock(p.id, p.stock - quantity, -quantity, `Sale ${sale}`, sale);
         }
         return repo.receipt(sale);
       });

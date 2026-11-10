@@ -655,36 +655,22 @@ toggleScannerBtn.addEventListener("click", () =>
 
 // --- Navigation Tab Switching ---
 
-navPos.addEventListener("click", () => {
-  navPos.classList.add("active");
-  navInventory.classList.remove("active");
-  navDashboard.classList.remove("active");
-  posView.classList.remove("hidden");
-  inventoryView.classList.add("hidden");
-  dashboardView.classList.add("hidden");
-  barcodeInput.focus();
-});
+function showStoreView(name) {
+  for (const view of ["pos", "inventory", "dashboard", "sales"]) {
+    document.getElementById(view + "-view").classList.toggle("hidden", view !== name);
+    document.getElementById("nav-" + view).classList.toggle("active", view === name);
+  }
+  if (name === "pos") barcodeInput.focus();
+  else stopCameraScanner();
+}
 
+navPos.addEventListener("click", () => showStoreView("pos"));
 navInventory.addEventListener("click", () => {
-  navInventory.classList.add("active");
-  navPos.classList.remove("active");
-  navDashboard.classList.remove("active");
-  inventoryView.classList.remove("hidden");
-  posView.classList.add("hidden");
-  dashboardView.classList.add("hidden");
-  // Pause the camera barcode scanner to save CPU and camera resources when switching tabs
-  stopCameraScanner();
+  showStoreView("inventory");
   loadInventory();
 });
-
 navDashboard.addEventListener("click", () => {
-  navDashboard.classList.add("active");
-  navPos.classList.remove("active");
-  navInventory.classList.remove("active");
-  dashboardView.classList.remove("hidden");
-  posView.classList.add("hidden");
-  inventoryView.classList.add("hidden");
-  stopCameraScanner();
+  showStoreView("dashboard");
   loadDashboardAnalytics();
 });
 
@@ -708,10 +694,18 @@ async function loadInventory() {
 }
 
 // Render inventory array to view table, with search query filtering
+function stockStatus(product) {
+  if (product.stock === 0) return "Out of Stock";
+  if (product.stock !== null && product.reorder_level != null &&
+      product.stock <= product.reorder_level) return "Low Stock";
+  return "";
+}
+
 function renderInventoryTable() {
   const query = inventorySearch.value.trim().toLowerCase();
 
   const filtered = inventoryProducts.filter((p) => {
+    if (document.getElementById("low-stock-only").checked && !stockStatus(p)) return false;
     return (
       p.name.toLowerCase().includes(query) ||
       p.barcode_string.toLowerCase().includes(query)
@@ -735,9 +729,11 @@ function renderInventoryTable() {
                 <tr>
                     <td style="font-family: monospace; font-size: 0.95rem; font-weight: 500;">${escapeHTML(p.barcode_string)}</td>
                     <td>${escapeHTML(p.name)}</td>
-                    <td style="font-weight: 600;">${formattedPrice}<br><small>Stock: ${p.stock === null ? "Untracked" : p.stock}</small> <button ${currentRole !== "admin" ? "hidden" : ""} class="action-btn" data-action="stock" data-id="${p.id}" title="Adjust stock">±</button></td>
+                    <td style="font-weight: 600;">${formattedPrice}<br><small>Stock: ${p.stock === null ? "Untracked" : p.stock}</small> ${stockStatus(p) ? `<span class="stock-badge">${stockStatus(p)}</span>` : ""} <button ${currentRole !== "admin" ? "hidden" : ""} class="action-btn" data-action="stock" data-id="${p.id}" title="Adjust stock">±</button></td>
                     <td>
                         <div class="action-btn-group" ${currentRole !== "admin" ? "hidden" : ""}>
+                            <button class="nav-tab" data-action="history" data-id="${p.id}">Stock History</button>
+                            ${p.stock !== null ? `<button class="nav-tab" data-action="reorder" data-id="${p.id}">Reorder Level: ${p.reorder_level ?? "Off"}</button>` : ""}
                             <button class="action-btn edit-btn" data-action="edit" data-id="${p.id}" title="Edit Product">
                                 <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                             </button>
@@ -755,6 +751,7 @@ function renderInventoryTable() {
 
 // Attach filter input listener
 inventorySearch.addEventListener("input", renderInventoryTable);
+document.getElementById("low-stock-only").addEventListener("change", renderInventoryTable);
 
 // Form modal controls
 addProductBtn.addEventListener("click", () => {
@@ -916,7 +913,7 @@ async function loadDashboardAnalytics() {
           return `
                     <tr>
                         <td style="font-weight: 500;">${escapeHTML(name)}</td>
-                        <td style="font-weight: 600;"><span class="qty-badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">${item.times_sold}</span></td>
+                        <td style="font-weight: 600;"><span class="qty-badge">${item.times_sold}</span></td>
                         <td style="font-weight: 600;">${formattedRevenue}</td>
                     </tr>
                 `;
@@ -950,10 +947,6 @@ function renderSalesChart(labels, data) {
     salesChartInstance.destroy();
   }
 
-  // Create a beautiful blue gradient for line chart fill
-  const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-  gradient.addColorStop(0, "rgba(59, 130, 246, 0.45)");
-  gradient.addColorStop(1, "rgba(59, 130, 246, 0.0)");
 
   salesChartInstance = new Chart(ctx, {
     type: "line",
@@ -963,12 +956,12 @@ function renderSalesChart(labels, data) {
         {
           label: "Sales Revenue (₱)",
           data: data.map((cents) => cents / 100), // Convert cents to decimal pesos
-          borderColor: "#3b82f6",
+          borderColor: "#245bbd",
           borderWidth: 3,
-          backgroundColor: gradient,
+          backgroundColor: "rgba(36, 91, 189, 0.08)",
           fill: true,
           tension: 0.35, // Smooth curves
-          pointBackgroundColor: "#3b82f6",
+          pointBackgroundColor: "#245bbd",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
           pointRadius: 5,
@@ -984,10 +977,10 @@ function renderSalesChart(labels, data) {
           display: false,
         },
         tooltip: {
-          backgroundColor: "#0f172a",
-          titleColor: "#f8fafc",
-          bodyColor: "#f8fafc",
-          borderColor: "rgba(255, 255, 255, 0.1)",
+          backgroundColor: "#ffffff",
+          titleColor: "#172438",
+          bodyColor: "#172438",
+          borderColor: "#dce3ec",
           borderWidth: 1,
           padding: 12,
           displayColors: false,
@@ -1001,11 +994,11 @@ function renderSalesChart(labels, data) {
       scales: {
         x: {
           grid: {
-            color: "rgba(255, 255, 255, 0.05)",
+            color: "#e5ebf3",
             borderColor: "transparent",
           },
           ticks: {
-            color: "#94a3b8",
+            color: "#47576d",
             font: {
               family: "'Inter', sans-serif",
               size: 11,
@@ -1014,11 +1007,11 @@ function renderSalesChart(labels, data) {
         },
         y: {
           grid: {
-            color: "rgba(255, 255, 255, 0.05)",
+            color: "#e5ebf3",
             borderColor: "transparent",
           },
           ticks: {
-            color: "#94a3b8",
+            color: "#47576d",
             font: {
               family: "'Inter', sans-serif",
               size: 11,
@@ -1086,6 +1079,8 @@ window.addEventListener("offline", () =>
     currentRole = data.role;
     addProductBtn.hidden = currentRole !== "admin";
     navDashboard.hidden = currentRole !== "admin";
+    document.getElementById("sales-filters").hidden = currentRole !== "admin";
+    renderInventoryTable();
   } catch (err) {
     showError(err.message);
   }
@@ -1109,6 +1104,8 @@ inventoryBody.addEventListener("click", (event) => {
   if (!button || currentRole !== "admin") return;
   const id = Number(button.dataset.id);
   if (button.dataset.action === "stock") window.adjustStock(id);
+  else if (button.dataset.action === "history") openStockHistory(id);
+  else if (button.dataset.action === "reorder") editReorderLevel(id);
   else if (button.dataset.action === "edit") window.openEditProductModal(id);
   else if (button.dataset.action === "deactivate")
     window.deleteProductFromInventory(id);

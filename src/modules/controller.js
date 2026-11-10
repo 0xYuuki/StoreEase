@@ -18,4 +18,8 @@ module.exports = (service, analytics) => ({
     service.checkout(req.body || {}, req.headers["idempotency-key"]),
   ),
   analytics: respond(() => analytics()),
+  sales: respond((req) => service.sales(req.query)),
+  receipt: respond((req) => service.receipt(req.params.id)),
+  reorder: respond((req) => service.reorder(req.params.id, req.body || {})),
+  stockHistory: respond((req) => service.stockHistory(req.params.id, req.query.page)),
 });

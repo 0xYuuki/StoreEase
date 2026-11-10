@@ -4,6 +4,13 @@ const { test } = require("node:test"),
   vm = require("node:vm"),
   fs = require("node:fs");
 const source = fs.readFileSync("public/app.js", "utf8");
+test("low stock includes the threshold and zero, and clears after restock", () => {
+  const { run } = browser();
+  assert.equal(run('stockStatus({stock: 5, reorder_level: 5})'), "Low Stock");
+  assert.equal(run('stockStatus({stock: 6, reorder_level: 5})'), "");
+  assert.equal(run('stockStatus({stock: null, reorder_level: 5})'), "");
+  assert.equal(run('stockStatus({stock: 0, reorder_level: null})'), "Out of Stock");
+});
 function browser(t) {
   const elements = new Map(),
     documentEvents = {},

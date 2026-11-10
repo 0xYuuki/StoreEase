@@ -1,6 +1,11 @@
 # SQLite and data safety
 
-## Schema version 1
+## Schema version 2
+
+Version 2 adds optional product reorder levels and receipt references on new sale
+stock movements. Upgrading a version 1 database creates a backup before the
+migration. Existing movements retain their reasons and balances. Their receipt
+references are empty because version 1 recorded only free-text reasons.
 
 `PRAGMA user_version` tracks the migration. New databases are empty. Existing databases
 are never reseeded on startup.

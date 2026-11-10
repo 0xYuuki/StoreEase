@@ -10,7 +10,7 @@ async function openDatabase(filename) {
   try {
     db.exec("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;");
     const version = db.prepare("PRAGMA user_version").get().user_version;
-    if (version > 1)
+    if (version > 2)
       throw new Error("Database schema newer than this application");
     if (!version) {
       if (
@@ -22,6 +22,17 @@ async function openDatabase(filename) {
         console.log(`Pre-migration backup: ${destination}`);
       }
       require("./migrations/001-reliability")(db);
+    }
+    if (version < 2) {
+      if (version === 1 && filename !== ":memory:") {
+        const destination = `${filename}.backup-${Date.now()}-${randomUUID()}.sqlite`;
+        await backup(db, destination);
+        console.log(`Pre-migration backup: ${destination}`);
+      }
+      transaction(db, () => {
+        if (db.prepare("PRAGMA user_version").get().user_version === 2) return;
+        require("./migrations/002-history")(db);
+      });
     }
     if (
       db.prepare("PRAGMA integrity_check").get().integrity_check !== "ok" ||

@@ -1,15 +1,18 @@
 :root {
-    --bg-color: #0f172a; /* Slate 900 */
-    --surface-color: rgba(30, 41, 59, 0.7); /* Slate 800 with opacity */
-    --border-color: rgba(255, 255, 255, 0.1);
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --accent-color: #3b82f6; /* Blue 500 */
-    --accent-hover: #2563eb;
-    --danger-color: #ef4444;
-    --danger-bg: rgba(239, 68, 68, 0.1);
-    --success-color: #10b981;
-    --glass-blur: blur(16px);
+    color-scheme: light;
+    --bg-color: #f6f8fb;
+    --surface-color: #ffffff;
+    --surface-muted: #eff3f8;
+    --border-color: #dce3ec;
+    --input-border: #8392a7;
+    --text-primary: #172438;
+    --text-secondary: #47576d;
+    --accent-color: #245bbd;
+    --accent-hover: #194898;
+    --accent-soft: #eaf1ff;
+    --danger-color: #b42332;
+    --danger-bg: #fff0f1;
+    --success-color: #157348;
 }
 
 * {
@@ -21,9 +24,6 @@
 body {
     font-family: 'Inter', sans-serif;
     background-color: var(--bg-color);
-    background-image: 
-        radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
-        radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.15), transparent 25%);
     color: var(--text-primary);
     min-height: 100vh;
     display: flex;
@@ -64,9 +64,7 @@ body {
     font-size: 1.8rem;
     font-weight: 700;
     letter-spacing: -0.5px;
-    background: linear-gradient(to right, #60a5fa, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-primary);
 }
 
 .status {
@@ -79,7 +77,6 @@ body {
     padding: 0.5rem 1rem;
     border-radius: 99px;
     border: 1px solid var(--border-color);
-    backdrop-filter: var(--glass-blur);
 }
 
 .status-indicator {
@@ -87,7 +84,6 @@ body {
     height: 8px;
     border-radius: 50%;
     background-color: var(--success-color);
-    box-shadow: 0 0 10px var(--success-color);
 }
 
 .error-banner {
@@ -110,8 +106,7 @@ body {
 .cart-container {
     background: var(--surface-color);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    backdrop-filter: var(--glass-blur);
+    border-radius: 12px;
     flex: 1;
     overflow-y: auto;
     position: relative;
@@ -134,7 +129,7 @@ body {
 
 .cart-table td {
     padding: 1.25rem 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--surface-muted);
 }
 
 .cart-table tbody tr {
@@ -143,7 +138,7 @@ body {
 }
 
 .cart-table tbody tr:hover {
-    background-color: rgba(255, 255, 255, 0.02);
+    background-color: var(--bg-color);
 }
 
 .item-name {
@@ -157,7 +152,7 @@ body {
 }
 
 .qty-badge {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--surface-muted);
     padding: 0.25rem 0.75rem;
     border-radius: 99px;
     font-weight: 600;
@@ -184,8 +179,7 @@ body {
 .summary-card, .manual-entry-card {
     background: var(--surface-color);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    backdrop-filter: var(--glass-blur);
+    border-radius: 12px;
     padding: 1.5rem;
 }
 
@@ -227,12 +221,10 @@ body {
 
 .checkout-btn:hover:not(:disabled) {
     background-color: var(--accent-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .checkout-btn:disabled {
-    background-color: #334155;
+    background-color: var(--surface-muted);
     color: #64748b;
     cursor: not-allowed;
 }
@@ -244,11 +236,11 @@ body {
 
 .manual-input-group input {
     flex: 1;
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--bg-color);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 0.75rem;
-    color: white;
+    color: var(--text-primary);
     outline: none;
 }
 
@@ -257,9 +249,9 @@ body {
 }
 
 .manual-input-group button {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--surface-muted);
     border: 1px solid var(--border-color);
-    color: white;
+    color: var(--text-primary);
     padding: 0.75rem 1rem;
     border-radius: 8px;
     cursor: pointer;
@@ -267,7 +259,7 @@ body {
 }
 
 .manual-input-group button:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--border-color);
 }
 
 /* Modal */
@@ -275,7 +267,6 @@ body {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -293,7 +284,6 @@ body {
     border-radius: 12px;
     width: 90%;
     max-width: 400px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 .receipt h2 {
@@ -339,7 +329,7 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 0.75rem;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--surface-muted);
     padding: 0.25rem 0.5rem;
     border-radius: 99px;
     border: 1px solid var(--border-color);
@@ -350,7 +340,7 @@ body {
     height: 24px;
     border-radius: 50%;
     border: none;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--surface-muted);
     color: var(--text-primary);
     font-size: 1rem;
     font-weight: 600;
@@ -363,11 +353,6 @@ body {
 
 .qty-btn:hover {
     background: var(--accent-color);
-    transform: scale(1.1);
-}
-
-.qty-btn:active {
-    transform: scale(0.95);
 }
 
 .qty-val {
@@ -400,19 +385,13 @@ body {
 .delete-btn:hover {
     color: var(--danger-color);
     background: var(--danger-bg);
-    transform: scale(1.1);
-}
-
-.delete-btn:active {
-    transform: scale(0.95);
 }
 
 /* Camera scanner card styles */
 .camera-scanner-card {
     background: var(--surface-color);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    backdrop-filter: var(--glass-blur);
+    border-radius: 12px;
     padding: 1.5rem;
 }
 
@@ -433,7 +412,7 @@ body {
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--border-color);
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--surface-muted);
 }
 
 /* Custom styling for html5-qrcode controls */
@@ -448,9 +427,9 @@ body {
 }
 
 #reader button {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--surface-muted);
     border: 1px solid var(--border-color);
-    color: white;
+    color: var(--text-primary);
     padding: 0.5rem 1rem;
     border-radius: 6px;
     cursor: pointer;
@@ -482,13 +461,10 @@ body {
 
 .scanner-btn:hover {
     filter: brightness(1.1);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .scanner-btn.active {
     background-color: var(--danger-color);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 /* Main Navigation Bar Styles */
@@ -498,7 +474,6 @@ body {
     align-items: center;
     background: var(--surface-color);
     border-bottom: 1px solid var(--border-color);
-    backdrop-filter: var(--glass-blur);
     padding: 1rem 2rem;
     position: sticky;
     top: 0;
@@ -510,9 +485,7 @@ body {
     font-size: 1.35rem;
     font-weight: 700;
     letter-spacing: -0.5px;
-    background: linear-gradient(to right, #60a5fa, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-primary);
 }
 
 .pos-navbar {
@@ -544,17 +517,13 @@ body {
 
 .nav-tab:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--surface-muted);
 }
 
 .nav-tab.active {
-    background: rgba(59, 130, 246, 0.15);
-    border-color: rgba(59, 130, 246, 0.3);
-    color: #60a5fa;
-}
-
-.nav-tab.active svg.nav-icon {
-    transform: scale(1.1);
+    background: var(--accent-soft);
+    border-color: var(--border-color);
+    color: var(--accent-color);
 }
 
 /* Adjust page containers for navbar layout */
@@ -583,8 +552,7 @@ body {
 .inventory-card {
     background: var(--surface-color);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    backdrop-filter: var(--glass-blur);
+    border-radius: 12px;
     padding: 2rem;
 }
 
@@ -604,13 +572,13 @@ body {
 }
 
 .count-badge {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--surface-muted);
     color: var(--text-secondary);
     font-size: 0.8rem;
     font-weight: 600;
     padding: 0.3rem 0.8rem;
     border-radius: 99px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--surface-muted);
 }
 
 .add-btn {
@@ -635,8 +603,6 @@ body {
 
 .add-btn:hover {
     background-color: var(--accent-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 /* Search and Filter bar */
@@ -647,7 +613,7 @@ body {
 .search-box {
     display: flex;
     align-items: center;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--bg-color);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 0.6rem 1rem;
@@ -669,7 +635,7 @@ body {
 .search-box input {
     background: transparent;
     border: none;
-    color: white;
+    color: var(--text-primary);
     outline: none;
     width: 100%;
     font-size: 0.95rem;
@@ -696,7 +662,7 @@ body {
 
 .inventory-table td {
     padding: 1.2rem 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--surface-muted);
 }
 
 .inventory-table tbody tr {
@@ -704,7 +670,7 @@ body {
 }
 
 .inventory-table tbody tr:hover {
-    background-color: rgba(255, 255, 255, 0.02);
+    background-color: var(--bg-color);
 }
 
 /* Action controls */
@@ -727,25 +693,23 @@ body {
 }
 
 .edit-btn {
-    background: rgba(59, 130, 246, 0.12);
-    color: #60a5fa;
+    background: var(--accent-soft);
+    color: var(--accent-color);
 }
 
 .edit-btn:hover {
     background: var(--accent-color);
     color: white;
-    transform: scale(1.08);
 }
 
 .delete-btn-inv {
-    background: rgba(239, 68, 68, 0.12);
+    background: var(--danger-bg);
     color: var(--danger-color);
 }
 
 .delete-btn-inv:hover {
     background: var(--danger-color);
     color: white;
-    transform: scale(1.08);
 }
 
 .empty-inventory {
@@ -821,7 +785,6 @@ body {
 .form-group input:focus {
     border-color: var(--accent-color);
     background: #fff;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .input-with-button {
@@ -870,7 +833,6 @@ body {
 .price-input-wrapper:focus-within {
     border-color: var(--accent-color);
     background: #fff;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .price-prefix {
@@ -883,7 +845,6 @@ body {
     border: none !important;
     background: transparent !important;
     padding: 0.75rem 0.5rem !important;
-    box-shadow: none !important;
 }
 
 .modal-form-actions {
@@ -919,7 +880,6 @@ body {
 
 .modal-btn.save-btn:hover {
     background-color: var(--accent-hover);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
 
 /* Dashboard view styling */
@@ -942,8 +902,7 @@ body {
 .kpi-card {
     background: var(--surface-color);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    backdrop-filter: var(--glass-blur);
+    border-radius: 12px;
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
@@ -952,9 +911,7 @@ body {
 }
 
 .kpi-card:hover {
-    transform: translateY(-2px);
     border-color: rgba(59, 130, 246, 0.2);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
 .kpi-label {
@@ -992,8 +949,7 @@ body {
 .analytics-card {
     background: var(--surface-color);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    backdrop-filter: var(--glass-blur);
+    border-radius: 12px;
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
@@ -1034,7 +990,7 @@ body {
 }
 
 .popular-table tbody tr:hover {
-    background-color: rgba(255, 255, 255, 0.01);
+    background-color: var(--bg-color);
 }
 
 .empty-popular {
@@ -1087,7 +1043,7 @@ body {
 
 .tendered-input-wrapper input {
     width: 100%;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--bg-color);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 0.75rem 1rem 0.75rem 2rem;
@@ -1100,14 +1056,13 @@ body {
 
 .tendered-input-wrapper input:focus:not(:disabled) {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--surface-color);
 }
 
 .tendered-input-wrapper input:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    background: rgba(0, 0, 0, 0.1);
+    background: var(--surface-muted);
 }
 
 .change-row {
@@ -1141,3 +1096,57 @@ body {
 .modal-content { max-height: 90vh; overflow-y: auto; }
 
 [hidden] { display: none !important; }
+
+.history-form { display: flex; align-items: end; gap: .75rem; flex-wrap: wrap; margin: 1rem 0; }
+.history-form label { display: grid; gap: .3rem; }
+.history-form input { min-width: 0; max-width: 100%; padding: .55rem; border-radius: .4rem; }
+.history-panel { margin: 1rem 0; padding: 1rem; border: 1px solid var(--border-color); border-radius: .75rem; }
+.history-list { padding: 0; list-style: none; }
+.history-list li { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; padding: .7rem 0; border-bottom: 1px solid var(--border-color); overflow-wrap: anywhere; }
+.sales-results li { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+.history-list .nav-tab { justify-self: start; }
+.stock-badge { display: inline-block; color: #77430a; background: #fff1d6; padding: .2rem .4rem; border-radius: .35rem; }
+.action-btn-group { flex-wrap: wrap; }
+@media (max-width: 600px) {
+    .sales-results li { grid-template-columns: 1fr; gap: .35rem; }
+    .history-panel { padding: .65rem; }
+}
+@media print {
+    body.printing-receipt { display: block; background: white; color: black; height: auto; overflow: visible; }
+    body.printing-receipt > :not(#sales-view),
+    body.printing-receipt #sales-view > :not(#historical-receipt),
+    body.printing-receipt #print-historical-receipt { display: none !important; }
+    body.printing-receipt #sales-view { padding: 0; width: auto; max-width: none; }
+    body.printing-receipt #historical-receipt { border: 0; padding: 0; }
+    body.printing-receipt #historical-receipt li { break-inside: avoid; border-color: #aaa; }
+}
+
+/* Light surfaces and visible keyboard focus across the POS and history views. */
+input, button, select { font: inherit; }
+input[type="checkbox"] { accent-color: var(--accent-color); }
+:where(button, input, select, a):focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 3px;
+}
+.search-box:focus-within, .price-input-wrapper:focus-within {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+.manual-input-group input, .tendered-input-wrapper input, .history-form input {
+    border: 1px solid var(--input-border);
+}
+.history-form input {
+    background: var(--surface-color);
+    color: var(--text-primary);
+}
+.history-panel, .sales-results {
+    background: var(--surface-color);
+}
+.sales-results:not(:empty) {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0 1rem;
+}
+.history-list li:last-child { border-bottom: 0; }
+#reader button:hover, .qty-btn:hover { color: white; }
+.nav-tab:disabled { opacity: .55; cursor: default; }

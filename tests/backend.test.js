@@ -41,6 +41,61 @@ const sale = (id, quantity = 1) => ({
   total_amount: -1,
   items: [{ product_id: id, quantity, price: 0 }],
 });
+
+test("history permissions, Manila date pagination, and immutable receipt details", async (t) => {
+  const adminToken = "a".repeat(32);
+  const cashierToken = "c".repeat(32);
+  const admin = { Authorization: "Bearer " + adminToken };
+  const cashier = { Authorization: "Bearer " + cashierToken };
+  const { db, request, service } = await fixture(t, { host: "127.0.0.1", adminToken, cashierToken });
+  const item = service.create(product());
+  const receipt = service.checkout(sale(item.id), "history");
+  db.prepare("UPDATE Sales SET timestamp=? WHERE id=?").run("2026-11-09 16:00:00", receipt.sale_id);
+  db.exec(`
+    INSERT INTO Sales(timestamp,total_amount) VALUES ('2026-11-09 15:59:59', 10), ('2026-11-10 16:00:00', 20);
+    WITH RECURSIVE rows(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM rows WHERE n<25)
+    INSERT INTO Sales(timestamp,total_amount) SELECT '2026-11-10 12:00:00', 30 FROM rows;
+  `);
+  service.update(item.id, { ...product(), name: "Renamed", price: "99" });
+  service.deactivate(item.id);
+  const range = "/sales?from=2026-11-10&to=2026-11-10";
+  assert.equal((await request(range, "GET", undefined, cashier)).status, 403);
+  const first = (await request(range, "GET", undefined, admin)).body;
+  assert.equal(first.entries.length, 25);
+  assert.equal(first.has_more, true);
+  const second = (await request(range + "&page=2", "GET", undefined, admin)).body;
+  assert.deepEqual(second.entries.map((row) => row.id), [receipt.sale_id]);
+  const exact = await request("/sales/" + receipt.sale_id, "GET", undefined, cashier);
+  assert.equal(exact.status, 200);
+  assert.deepEqual(exact.body.items, receipt.items.map((item) => ({ ...item })));
+  assert.equal(exact.body.timestamp, "2026-11-09T16:00:00.000Z");
+  assert.equal((await request("/sales?from=2026-02-30&to=2026-03-01", "GET", undefined, admin)).status, 400);
+  assert.equal((await request("/sales/9999", "GET", undefined, cashier)).status, 404);
+});
+
+test("reorder levels and stock history respect permissions and link each checkout once", async (t) => {
+  const adminToken = "a".repeat(32);
+  const cashierToken = "c".repeat(32);
+  const admin = { Authorization: "Bearer " + adminToken };
+  const cashier = { Authorization: "Bearer " + cashierToken };
+  const { request, service } = await fixture(t, { host: "127.0.0.1", adminToken, cashierToken });
+  const { id } = service.create(product());
+  const level = `/products/${id}/reorder-level`;
+  const history = `/products/${id}/stock-history`;
+  assert.equal((await request(level, "PUT", { reorder_level: 5 }, admin)).status, 409);
+  service.adjust(id, { delta: 6, reason: "Restock" });
+  assert.equal((await request(level, "PUT", { reorder_level: 5 }, cashier)).status, 403);
+  assert.equal((await request(history, "GET", undefined, cashier)).status, 403);
+  assert.equal((await request(level, "PUT", { reorder_level: -1 }, admin)).status, 400);
+  assert.equal((await request(level, "PUT", { reorder_level: 5 }, admin)).body.reorder_level, 5);
+  const receipt = service.checkout(sale(id), "linked");
+  service.checkout(sale(id), "linked");
+  const { entries } = (await request(history, "GET", undefined, admin)).body;
+  assert.deepEqual(entries.map(({ delta, resulting_stock, sale_id }) =>
+    [delta, resulting_stock, sale_id]), [[-1, 5, receipt.sale_id], [6, 6, null]]);
+  assert.equal((await request("/products/001", "GET", undefined, cashier)).body.stock, 5);
+  assert.equal((await request(level, "PUT", { reorder_level: null }, admin)).body.reorder_level, null);
+});
 test("strict exact monetary and ID validation", () => {
   for (const value of [
     "1x",

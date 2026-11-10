@@ -27,6 +27,7 @@
                 </svg>
                 Inventory
             </button>
+            <button id="nav-sales" class="nav-tab">Sales History</button>
             <button hidden id="nav-dashboard" class="nav-tab">
                 <svg viewBox="0 0 24 24" class="nav-icon">
                     <path
@@ -148,6 +149,7 @@
 
                 <!-- Search and Filter Bar -->
                 <div class="inventory-filter-bar">
+                    <label><input type="checkbox" id="low-stock-only"> Low stock and out of stock only</label>
                     <div class="search-box">
                         <svg viewBox="0 0 24 24" class="search-icon">
                             <path
@@ -157,6 +159,12 @@
                             autocomplete="off">
                     </div>
                 </div>
+                <section id="stock-history-panel" class="history-panel" hidden aria-labelledby="stock-history-title">
+                    <h3 id="stock-history-title" tabindex="-1">Stock history</h3>
+                    <p id="stock-history-status" role="status"></p>
+                    <ul id="stock-movements" class="history-list"></ul>
+                    <button type="button" id="stock-more" class="nav-tab" hidden>Load more</button>
+                </section>
 
                 <div class="inventory-table-wrapper">
                     <table class="inventory-table">
@@ -308,7 +316,35 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
+    <section id="sales-view" class="view-section hidden inventory-container" aria-labelledby="sales-heading">
+        <h2 id="sales-heading">Sales History</h2>
+        <form id="receipt-search" class="history-form">
+            <label>Receipt number <input name="receipt" inputmode="numeric" pattern="[1-9][0-9]*" required></label>
+            <button class="add-btn">Find receipt</button>
+        </form>
+        <form id="sales-filters" class="history-form" hidden>
+            <label>From <input type="date" name="from" required></label>
+            <label>To <input type="date" name="to" required></label>
+            <button class="add-btn">Show sales</button>
+        </form>
+        <p id="sales-status" role="status"></p>
+        <ul id="sales-results" class="history-list sales-results"></ul>
+        <div class="history-form" id="sales-pagination" hidden>
+            <button type="button" class="nav-tab" id="sales-prev">Previous</button>
+            <span id="sales-page"></span>
+            <button type="button" class="nav-tab" id="sales-next">Next</button>
+        </div>
+        <p id="receipt-status" role="status"></p>
+        <article id="historical-receipt" class="history-panel" hidden>
+            <h3 id="historical-receipt-title" tabindex="-1"></h3>
+            <p id="historical-receipt-date"></p>
+            <ul id="historical-receipt-items" class="history-list"></ul>
+            <p id="historical-receipt-total"></p>
+            <button type="button" class="add-btn" id="print-historical-receipt">Print Receipt</button>
+        </article>
+    </section>
     <script src="app.js"></script>
+    <script src="history.js"></script>
 </body>
 
 </html>
