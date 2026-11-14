@@ -18,7 +18,7 @@ async function start() {
   }
   server.requestTimeout = 15000;
   server.headersTimeout = 10000;
-  console.log("StoreEase: http://" + config.host + ":" + server.address().port);
+  console.log("Helen's Store: http://" + config.host + ":" + server.address().port);
   let closing = false;
   const stop = () => {
     if (closing) return;

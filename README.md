@@ -1,4 +1,4 @@
-# StoreEase
+# Helen's Store
 
 A small-store POS with barcode lookup, product management, optional stock counts,
 atomic sales, and Philippine calendar sales analytics. The existing vanilla HTML,
@@ -19,7 +19,7 @@ npm run migrate
 npm start
 ```
 
-Open [StoreEase](http://127.0.0.1:3000). `npm run dev` restarts the server after source
+Open [Helen's Store](http://127.0.0.1:3000). `npm run dev` restarts the server after source
 changes. Environment files are loaded by the npm scripts; direct `node server.js`
 uses already exported environment variables. A fresh installation creates an empty
 database. It does not seed an account, products, or sales.

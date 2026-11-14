@@ -12,7 +12,7 @@ async function apiFetch(url, options = {}) {
     });
   let response = await send();
   if (response.status === 401) {
-    apiToken = prompt("Enter your StoreEase access token") || "";
+    apiToken = prompt("Enter your Helen's Store access token") || "";
     if (apiToken) response = await send();
   }
   return response;
