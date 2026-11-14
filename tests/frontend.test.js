@@ -46,6 +46,9 @@ function browser(t) {
       addEventListener: (name, fn) => {
         el.listeners[name] = fn;
       },
+      insertAdjacentHTML(pos, html) {
+        el.innerHTML += html;
+      },
       focus() {
         doc.activeElement = el;
       },
@@ -363,4 +366,60 @@ test("debt status tabs filter active debts vs fully paid debtors and display cou
   assert.ok(e("debtors-table-body").innerHTML.includes("Aling Nena"));
   assert.ok(e("debtors-table-body").innerHTML.includes("Mang Juan"));
   assert.ok(e("debtors-table-body").innerHTML.includes("Pedro Penduko"));
+});
+
+test("product stock history displays in a pop-up modal and closes cleanly", async (t) => {
+  const { run, e, context } = browser(t);
+  const historyCode = fs.readFileSync("public/history.js", "utf8");
+
+  // Populate mock product in inventory
+  run(`inventoryProducts = [
+    { id: 5, name: "Corned Beef", barcode_string: "CB01", price: 4500, stock: 20 }
+  ]`);
+
+  // Mock API fetch for stock history
+  run(`apiFetch = async (url) => {
+    if (url.includes('/stock-history')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          entries: [
+            {
+              id: 1,
+              timestamp: '2026-11-14T10:00:00.000Z',
+              delta: 20,
+              resulting_stock: 20,
+              reason: 'Restock shipment',
+              sale_id: null
+            }
+          ],
+          has_more: false
+        })
+      };
+    }
+    return { ok: true, json: async () => [] };
+  }; window.apiFetch = apiFetch;`);
+
+  // Run history.js inside context
+  e("sales-filters").elements = { from: { value: "" }, to: { value: "" } };
+  e("receipt-search").elements = { receipt: { value: "" } };
+  vm.runInContext(historyCode, context);
+
+  // Initial state: panel is hidden
+  e("stock-history-panel").hidden = true;
+
+  // Open stock history for product 5
+  await run("openStockHistory(5)");
+
+  // Modal pops up
+  assert.equal(e("stock-history-panel").hidden, false);
+  assert.ok(e("stock-history-title").textContent.includes("Corned Beef"));
+  assert.ok(e("stock-history-current-stock").textContent.includes("20 units in stock"));
+  assert.ok(e("stock-movements").innerHTML.includes("Restock shipment"));
+  assert.ok(e("stock-movements").innerHTML.includes("+20"));
+
+  // Closing modal hides it
+  run("closeStockHistory()");
+  assert.equal(e("stock-history-panel").hidden, true);
 });

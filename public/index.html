@@ -184,17 +184,6 @@
                     </label>
                 </div>
 
-                <!-- Stock History Panel -->
-                <section id="stock-history-panel" class="history-panel" hidden aria-labelledby="stock-history-title">
-                    <div class="panel-header">
-                        <h3 id="stock-history-title" tabindex="-1">Stock History</h3>
-                        <button type="button" class="panel-close-btn" onclick="document.getElementById('stock-history-panel').hidden = true;">&times;</button>
-                    </div>
-                    <p id="stock-history-status" role="status" class="status-msg"></p>
-                    <ul id="stock-movements" class="history-list"></ul>
-                    <button type="button" id="stock-more" class="load-more-btn" hidden>Load more</button>
-                </section>
-
                 <div class="inventory-table-wrapper">
                     <table class="inventory-table">
                         <thead>
@@ -456,6 +445,32 @@
                     <button type="submit" id="save-product-btn" class="modal-btn save-btn">Save Product</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Product Stock History Modal (Pop-up) -->
+    <div id="stock-history-panel" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="stock-history-title">
+        <div class="modal-content stock-history-modal-content">
+            <header class="modal-header">
+                <div>
+                    <h2 id="stock-history-title" tabindex="-1">Stock History</h2>
+                    <p id="stock-history-subtitle" class="panel-subtitle" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">Track inventory adjustments and sales</p>
+                </div>
+                <button type="button" id="close-stock-history-x" class="modal-close-x" aria-label="Close stock history modal">&times;</button>
+            </header>
+
+            <div class="stock-history-summary-box">
+                <span>Current Stock Level:</span>
+                <strong id="stock-history-current-stock" class="stock-current-badge">0 units</strong>
+            </div>
+
+            <p id="stock-history-status" role="status" class="status-msg"></p>
+            <ul id="stock-movements" class="history-list stock-history-list"></ul>
+            <button type="button" id="stock-more" class="load-more-btn" hidden>Load more movements</button>
+
+            <div class="modal-form-actions" style="margin-top: 1.25rem;">
+                <button type="button" id="close-stock-history-btn" class="modal-btn cancel-btn" style="width: 100%;">Close</button>
+            </div>
         </div>
     </div>
 

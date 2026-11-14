@@ -193,31 +193,71 @@ async function editReorderLevel(id) {
   }
 }
 
+function closeStockHistory() {
+  if (stockPanel) stockPanel.hidden = true;
+}
+
+historyElement("close-stock-history-x")?.addEventListener("click", closeStockHistory);
+historyElement("close-stock-history-btn")?.addEventListener("click", closeStockHistory);
+
+if (stockPanel) {
+  stockPanel.addEventListener("click", (e) => {
+    if (e.target === stockPanel) closeStockHistory();
+  });
+}
+
 async function openStockHistory(id, page = 1) {
   const request = ++movementRequest;
   const title = historyElement("stock-history-title");
+  const subtitle = historyElement("stock-history-subtitle");
+  const currentStockBadge = historyElement("stock-history-current-stock");
   const status = historyElement("stock-history-status");
   const list = historyElement("stock-movements");
   const more = historyElement("stock-more");
   historyProductId = id;
+
+  const product = inventoryProducts.find((item) => item.id === id);
+
   if (page === 1) {
     list.innerHTML = "";
-    title.textContent = "Stock history · " + inventoryProducts.find((item) => item.id === id).name;
+    if (title) title.textContent = product ? `Stock History · ${product.name}` : "Stock History";
+    if (subtitle) {
+      subtitle.textContent = product ? `Barcode: ${product.barcode_string} | Price: ${formatCurrency(product.price)}` : "";
+    }
+    if (currentStockBadge) {
+      if (product) {
+        currentStockBadge.textContent = product.stock !== null ? `${product.stock} units in stock` : "Untracked stock";
+      }
+    }
     stockPanel.hidden = false;
-    title.focus();
+    title?.focus?.();
   }
   more.hidden = true;
   status.textContent = "Loading movements…";
   try {
     const data = await historyJson(`/api/products/${id}/stock-history?page=${page}`);
     if (request !== movementRequest) return;
-    list.insertAdjacentHTML("beforeend", data.entries.map((move) => `
-      <li>
-        <span>${manilaDateTime.format(new Date(move.timestamp))}</span>
-        <strong>${move.delta > 0 ? "+" : ""}${move.delta} → ${move.resulting_stock} remaining</strong>
-        <span>${escapeHTML(move.reason)}</span>
-        ${move.sale_id === null ? "" : `<button type="button" class="nav-tab" data-receipt="${move.sale_id}">Receipt #${move.sale_id}</button>`}
-      </li>`).join(""));
+    list.insertAdjacentHTML(
+      "beforeend",
+      data.entries
+        .map((move) => {
+          const isPositive = move.delta > 0;
+          const deltaClass = isPositive ? "text-success" : "text-danger";
+          const deltaText = isPositive ? `+${move.delta}` : `${move.delta}`;
+          return `
+      <li class="stock-movement-item">
+        <div class="movement-main">
+          <span class="movement-date">${manilaDateTime.format(new Date(move.timestamp))}</span>
+          <span class="movement-reason">${escapeHTML(move.reason)}</span>
+        </div>
+        <div class="movement-meta">
+          <span class="movement-delta ${deltaClass}"><strong>${deltaText}</strong> (${move.resulting_stock} left)</span>
+          ${move.sale_id === null ? "" : `<button type="button" class="nav-tab receipt-link-btn" data-receipt="${move.sale_id}">Receipt #${move.sale_id}</button>`}
+        </div>
+      </li>`;
+        })
+        .join(""),
+    );
     movementPage = page;
     more.hidden = !data.has_more;
     status.textContent = data.entries.length ? "" : "No recorded movements.";
@@ -233,6 +273,7 @@ historyElement("stock-more").addEventListener("click", () =>
 historyElement("stock-movements").addEventListener("click", (event) => {
   const button = event.target.closest("[data-receipt]");
   if (!button) return;
+  closeStockHistory();
   showStoreView("sales");
   showHistoricalReceipt(button.dataset.receipt);
 });
