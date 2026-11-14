@@ -37,7 +37,7 @@ test("legacy migration backs up, preserves exact money, flags mismatch, and is r
     db.prepare("SELECT snapshot_source FROM SaleItems").get().snapshot_source,
     "legacy-current-product",
   );
-  assert.equal(db.prepare("PRAGMA user_version").get().user_version, 2);
+  assert.equal(db.prepare("PRAGMA user_version").get().user_version, 3);
   assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
   db.close();
   const backups = fs.readdirSync(dir).filter((x) => x.includes(".backup-"));

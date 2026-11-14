@@ -56,6 +56,7 @@ if (
 }
 let currentRole = "cashier";
 let scanRequests = 0;
+let priceRejectionLock = false;
 
 // Constants
 
@@ -75,9 +76,45 @@ const errorBanner = document.getElementById("error-banner");
 const errorMessage = document.getElementById("error-message");
 const amountTenderedInput = document.getElementById("amount-tendered");
 const changeEl = document.getElementById("summary-change");
+const summaryChangeLabel = document.getElementById("summary-change-label");
+
+// Cash Shortage / Debt Modal DOM elements
+const shortageModal = document.getElementById("shortage-modal");
+const shortageTotalDue = document.getElementById("shortage-total-due");
+const shortageCashPaid = document.getElementById("shortage-cash-paid");
+const shortageAmountDue = document.getElementById("shortage-amount-due");
+const shortageCustomerInput = document.getElementById("shortage-customer-input");
+const shortageMatchBanner = document.getElementById("shortage-match-banner");
+const shortageDebtorsList = document.getElementById("shortage-debtors-list");
+const shortageDebtorsCount = document.getElementById("shortage-debtors-count");
+const confirmShortageBtn = document.getElementById("confirm-shortage-btn");
+const cancelShortageBtn = document.getElementById("cancel-shortage-btn");
+const closeShortageModalX = document.getElementById("close-shortage-modal-x");
+
+let activeShortageTotal = 0;
+let activeShortageCash = 0;
+let activeShortageAmount = 0;
+let shortageDebtorsCache = [];
+let selectedShortageDebtor = null;
 
 const manualBarcode = document.getElementById("manual-barcode");
 const manualAddBtn = document.getElementById("manual-add-btn");
+const searchPreviewDropdown = document.getElementById("search-preview-dropdown");
+let previewMatches = [];
+let selectedPreviewIndex = -1;
+
+function highlightMatch(text, query) {
+  if (!query || typeof text !== "string") return escapeHTML(text || "");
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const index = lowerText.indexOf(lowerQuery);
+  if (index === -1) return escapeHTML(text);
+
+  const before = escapeHTML(text.slice(0, index));
+  const matched = escapeHTML(text.slice(index, index + query.length));
+  const after = escapeHTML(text.slice(index + query.length));
+  return `${before}<mark class="search-match">${matched}</mark>${after}`;
+}
 
 const receiptModal = document.getElementById("receipt-modal");
 const receiptItems = document.getElementById("receipt-items");
@@ -127,6 +164,119 @@ let salesChartInstance = null;
 
 // --- Initialization & Event Listeners ---
 
+function updateSearchPreview() {
+  if (!searchPreviewDropdown) return;
+  const query = manualBarcode.value.trim().toLowerCase();
+  if (!query) {
+    hideSearchPreview();
+    return;
+  }
+
+  const products = Array.isArray(inventoryProducts) ? inventoryProducts : [];
+
+  // Filter products case-insensitively
+  const matches = products.filter((p) => {
+    const name = String(p.name || "").toLowerCase();
+    const barcode = String(p.barcode_string || "").toLowerCase();
+    return name.includes(query) || barcode.includes(query);
+  });
+
+  // Sort matches: first letter / prefix matches first
+  matches.sort((a, b) => {
+    const aName = String(a.name || "").toLowerCase();
+    const bName = String(b.name || "").toLowerCase();
+    const aFirst = aName.startsWith(query);
+    const bFirst = bName.startsWith(query);
+    if (aFirst && !bFirst) return -1;
+    if (!aFirst && bFirst) return 1;
+
+    const aWordFirst = aName.split(/\s+/).some((w) => w.startsWith(query));
+    const bWordFirst = bName.split(/\s+/).some((w) => w.startsWith(query));
+    if (aWordFirst && !bWordFirst) return -1;
+    if (!aWordFirst && bWordFirst) return 1;
+
+    const aBar = String(a.barcode_string || "").toLowerCase().startsWith(query);
+    const bBar = String(b.barcode_string || "").toLowerCase().startsWith(query);
+    if (aBar && !bBar) return -1;
+    if (!aBar && bBar) return 1;
+
+    return aName.localeCompare(bName);
+  });
+
+  previewMatches = matches.slice(0, 8);
+  selectedPreviewIndex = previewMatches.length > 0 ? 0 : -1;
+
+  if (previewMatches.length === 0) {
+    searchPreviewDropdown.innerHTML = `<div class="search-preview-empty">No products found matching "<strong>${escapeHTML(manualBarcode.value.trim())}</strong>"</div>`;
+    searchPreviewDropdown.classList.remove("hidden");
+    return;
+  }
+
+  searchPreviewDropdown.innerHTML = previewMatches
+    .map((p, index) => {
+      let stockText = "Untracked";
+      let stockClass = "";
+      if (p.stock !== null && p.stock !== undefined) {
+        if (p.stock === 0) {
+          stockText = "Out of Stock";
+          stockClass = "out-of-stock";
+        } else if (p.reorder_level != null && p.stock <= p.reorder_level) {
+          stockText = `${p.stock} (Low Stock)`;
+          stockClass = "low-stock";
+        } else {
+          stockText = `${p.stock} in stock`;
+        }
+      }
+
+      return `
+        <div class="search-preview-item ${index === selectedPreviewIndex ? "selected" : ""}" data-id="${p.id}" data-index="${index}" role="option">
+          <div class="preview-item-main">
+            <span class="preview-item-name">${highlightMatch(p.name, query)}</span>
+            <span class="preview-item-barcode">Code: ${highlightMatch(p.barcode_string, query)}</span>
+          </div>
+          <div class="preview-item-meta">
+            <span class="preview-item-price">${formatCurrency(p.price)}</span>
+            <span class="preview-item-stock ${stockClass}">${stockText}</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  searchPreviewDropdown.classList.remove("hidden");
+}
+
+function hideSearchPreview() {
+  if (!searchPreviewDropdown) return;
+  searchPreviewDropdown.classList.add("hidden");
+  searchPreviewDropdown.innerHTML = "";
+  previewMatches = [];
+  selectedPreviewIndex = -1;
+}
+
+function selectPreviewIndex(index) {
+  if (previewMatches.length === 0 || !searchPreviewDropdown) return;
+  selectedPreviewIndex = index;
+  if (typeof searchPreviewDropdown.querySelectorAll === "function") {
+    const items = searchPreviewDropdown.querySelectorAll(".search-preview-item");
+    items.forEach((item, i) => {
+      item.classList.toggle("selected", i === index);
+    });
+    if (items[index] && typeof items[index].scrollIntoView === "function") {
+      items[index].scrollIntoView({ block: "nearest" });
+    }
+  }
+}
+
+function addProductToCartAndReset(product) {
+  if (!product) return;
+  addToCart(product);
+  playBeep();
+  manualBarcode.value = "";
+  hideSearchPreview();
+  barcodeInput.focus();
+}
+
 // Always keep focus on the hidden barcode input, unless typing in manual entry or modal forms
 document.addEventListener("click", (e) => {
   // Only focus if the POS view is active and we are not interacting with form elements
@@ -135,11 +285,18 @@ document.addEventListener("click", (e) => {
     const clickedFormField =
       e.target.tagName === "INPUT" ||
       e.target.tagName === "BUTTON" ||
-      e.target.closest(".modal-content") ||
-      e.target.closest(".qty-control");
+      (e.target.closest && (
+        e.target.closest(".modal-content") ||
+        e.target.closest(".qty-control") ||
+        e.target.closest(".search-preview-dropdown") ||
+        e.target.closest(".pos-toolbar")
+      ));
     if (!clickedFormField) {
       barcodeInput.focus();
     }
+  }
+  if (searchPreviewDropdown && (!e.target.closest || !e.target.closest(".pos-toolbar"))) {
+    hideSearchPreview();
   }
 });
 
@@ -154,31 +311,103 @@ barcodeInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Manual entry fallback
-manualAddBtn.addEventListener("click", () => {
-  const val = manualBarcode.value.trim();
-  if (val) {
+// Manual entry & Search preview event listeners
+manualBarcode.addEventListener("input", async () => {
+  if (inventoryProducts.length === 0) {
+    await fetchProductsList();
+  }
+  updateSearchPreview();
+});
+
+manualBarcode.addEventListener("focus", async () => {
+  if (inventoryProducts.length === 0) {
+    await fetchProductsList();
+  }
+  if (manualBarcode.value.trim()) {
+    updateSearchPreview();
+  }
+});
+
+manualBarcode.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") {
+    if (previewMatches.length > 0) {
+      if (typeof e.preventDefault === "function") e.preventDefault();
+      const nextIndex = (selectedPreviewIndex + 1) % previewMatches.length;
+      selectPreviewIndex(nextIndex);
+    }
+  } else if (e.key === "ArrowUp") {
+    if (previewMatches.length > 0) {
+      if (typeof e.preventDefault === "function") e.preventDefault();
+      const prevIndex = (selectedPreviewIndex - 1 + previewMatches.length) % previewMatches.length;
+      selectPreviewIndex(prevIndex);
+    }
+  } else if (e.key === "Escape") {
+    hideSearchPreview();
+  } else if (e.key === "Enter") {
+    if (typeof e.preventDefault === "function") e.preventDefault();
+    const val = manualBarcode.value.trim();
+    if (!val) return;
+
+    if (selectedPreviewIndex >= 0 && previewMatches[selectedPreviewIndex]) {
+      addProductToCartAndReset(previewMatches[selectedPreviewIndex]);
+      return;
+    }
+    if (previewMatches.length > 0) {
+      addProductToCartAndReset(previewMatches[0]);
+      return;
+    }
     handleBarcodeScan(val);
     manualBarcode.value = "";
-  }
-  barcodeInput.focus();
-});
-manualBarcode.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    const val = manualBarcode.value.trim();
-    if (val) {
-      handleBarcodeScan(val);
-      manualBarcode.value = "";
-    }
+    hideSearchPreview();
     barcodeInput.focus();
   }
 });
+
+manualAddBtn.addEventListener("click", () => {
+  const val = manualBarcode.value.trim();
+  if (!val) {
+    barcodeInput.focus();
+    return;
+  }
+  if (selectedPreviewIndex >= 0 && previewMatches[selectedPreviewIndex]) {
+    addProductToCartAndReset(previewMatches[selectedPreviewIndex]);
+    return;
+  }
+  if (previewMatches.length > 0) {
+    addProductToCartAndReset(previewMatches[0]);
+    return;
+  }
+  handleBarcodeScan(val);
+  manualBarcode.value = "";
+  hideSearchPreview();
+  barcodeInput.focus();
+});
+
+if (searchPreviewDropdown) {
+  searchPreviewDropdown.addEventListener("click", (e) => {
+    const itemEl = e.target.closest ? e.target.closest(".search-preview-item") : null;
+    if (!itemEl) return;
+    const id = Number(itemEl.dataset ? itemEl.dataset.id : itemEl.getAttribute("data-id"));
+    const product = inventoryProducts.find((p) => p.id === id);
+    if (product) {
+      addProductToCartAndReset(product);
+    }
+  });
+}
 
 // Checkout process
 checkoutBtn.addEventListener("click", handleCheckout);
 
 // Payment calculations
-amountTenderedInput.addEventListener("input", calculateChange);
+amountTenderedInput.addEventListener("input", () => {
+  priceRejectionLock = false;
+  calculateChange();
+});
+amountTenderedInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.repeat && !checkoutBtn.disabled) {
+    handleCheckout();
+  }
+});
 
 // Close Receipt
 closeReceiptBtn.addEventListener("click", () => {
@@ -225,6 +454,7 @@ async function handleBarcodeScan(barcode) {
 }
 
 function addToCart(product) {
+  priceRejectionLock = false;
   // Check if item already in cart
   const existingItem = cart.find((item) => item.product.id === product.id);
 
@@ -254,31 +484,59 @@ function calculateChange() {
     totalCents += item.product.price * item.quantity;
   });
 
+  const changeLabel = document.getElementById("summary-change-label");
+
+  if (cart.length === 0) {
+    if (changeLabel) changeLabel.textContent = "Change";
+    changeEl.textContent = "₱0.00";
+    changeEl.classList.remove("insufficient-funds");
+    checkoutBtn.disabled = true;
+    checkoutBtn.textContent = "Complete Sale";
+    amountTenderedInput.value = "";
+    amountTenderedInput.disabled = true;
+    return;
+  }
+
+  amountTenderedInput.disabled = checkoutBusy || !!pendingCheckout;
+
+  if (priceRejectionLock) {
+    checkoutBtn.disabled = true;
+    return;
+  }
+
   const tenderedVal = amountTenderedInput.value.trim();
   if (!tenderedVal) {
+    if (changeLabel) changeLabel.textContent = "Change";
+    changeEl.textContent = "₱0.00";
+    changeEl.classList.remove("insufficient-funds");
+    checkoutBtn.disabled = checkoutBusy || scanRequests > 0 || cart.length === 0;
+    checkoutBtn.textContent = "Complete Sale";
+    return;
+  }
+
+  const tenderedCents = parsePesos(tenderedVal);
+  if (!Number.isSafeInteger(tenderedCents)) {
+    if (changeLabel) changeLabel.textContent = "Change";
     changeEl.textContent = "₱0.00";
     changeEl.classList.remove("insufficient-funds");
     checkoutBtn.disabled = true;
     return;
   }
 
-  const tenderedCents = parsePesos(tenderedVal);
   const changeCents = tenderedCents - totalCents;
-
-  amountTenderedInput.disabled = checkoutBusy || !!pendingCheckout;
-  if (!Number.isSafeInteger(changeCents) || !Number.isSafeInteger(totalCents)) {
-    changeEl.textContent = "₱0.00";
-    changeEl.classList.remove("insufficient-funds");
-    checkoutBtn.disabled = true;
-  } else if (changeCents < 0) {
-    changeEl.textContent = formatCurrency(changeCents);
+  if (changeCents < 0) {
+    const shortageCents = Math.abs(changeCents);
+    if (changeLabel) changeLabel.textContent = "Shortage";
+    changeEl.textContent = "-" + formatCurrency(shortageCents);
     changeEl.classList.add("insufficient-funds");
-    checkoutBtn.disabled = true;
+    checkoutBtn.disabled = checkoutBusy || scanRequests > 0 || cart.length === 0;
+    checkoutBtn.textContent = "Complete Sale (Short)";
   } else {
+    if (changeLabel) changeLabel.textContent = "Change";
     changeEl.textContent = formatCurrency(changeCents);
     changeEl.classList.remove("insufficient-funds");
-    checkoutBtn.disabled =
-      checkoutBusy || scanRequests > 0 || cart.length === 0;
+    checkoutBtn.disabled = checkoutBusy || scanRequests > 0 || cart.length === 0;
+    checkoutBtn.textContent = "Complete Sale";
   }
 }
 
@@ -343,15 +601,45 @@ function updateCartUI() {
 }
 
 async function handleCheckout() {
-  if (checkoutBusy || scanRequests) return;
+  if (checkoutBusy || scanRequests || priceRejectionLock) return;
+  if (cart.length === 0) return;
+
   if (pendingCheckout) {
     cart = pendingCheckout.cart;
-    amountTenderedInput.value = pendingCheckout.tendered;
+    amountTenderedInput.value = pendingCheckout.tendered || "";
+    return performCheckout();
   }
-  if (!Number.isSafeInteger(parsePesos(amountTenderedInput.value))) {
-    showError("Enter a valid payment amount.");
+
+  let totalCents = 0;
+  cart.forEach((item) => {
+    totalCents += item.product.price * item.quantity;
+  });
+
+  const tenderedVal = amountTenderedInput.value.trim();
+  let tenderedCents = 0;
+  if (tenderedVal) {
+    tenderedCents = parsePesos(tenderedVal);
+    if (!Number.isSafeInteger(tenderedCents)) {
+      showError("Enter a valid payment amount.");
+      return;
+    }
+  }
+
+  // Automatic cash shortage detection:
+  // If cash tendered is less than total due, automatically open shortage popup!
+  if (tenderedCents < totalCents) {
+    openShortageModal(totalCents, tenderedCents, totalCents - tenderedCents);
     return;
   }
+
+  // Full cash payment
+  return performCheckout({
+    payment_type: "cash",
+    tendered_amount: tenderedCents,
+  });
+}
+
+async function performCheckout(options = {}) {
   if (cart.length === 0 || checkoutBusy || scanRequests) return;
   checkoutBusy = true;
   checkoutBtn.disabled = true;
@@ -366,7 +654,10 @@ async function handleCheckout() {
       pendingCheckout = {
         key: crypto.randomUUID(),
         cart: structuredClone(cart),
-        tendered: amountTenderedInput.value,
+        tendered: amountTenderedInput.value || "0.00",
+        payment_type: options.payment_type || "cash",
+        customer_id: options.customer_id || null,
+        customer_name: options.customer_name || null,
       };
       try {
         sessionStorage.setItem(
@@ -380,12 +671,35 @@ async function handleCheckout() {
         );
       }
     }
-    // Prepare checkout transaction payload
+
     const itemsPayload = cart.map((item) => ({
       product_id: item.product.id,
       quantity: item.quantity,
-      price: item.product.price, // Display estimate only; server prices are authoritative.
+      price: item.product.price,
     }));
+
+    const checkoutBody = {
+      total_amount: totalCents,
+      items: itemsPayload,
+      payment_type: pendingCheckout.payment_type || options.payment_type || "cash",
+    };
+
+    if (checkoutBody.payment_type === "debt") {
+      if (pendingCheckout.customer_id || options.customer_id) {
+        checkoutBody.customer_id = pendingCheckout.customer_id || options.customer_id;
+      }
+      if (pendingCheckout.customer_name || options.customer_name) {
+        checkoutBody.customer_name = pendingCheckout.customer_name || options.customer_name;
+      }
+      if (options.tendered_amount !== undefined) {
+        checkoutBody.tendered_amount = options.tendered_amount;
+      } else if (pendingCheckout.tendered) {
+        const parsed = parsePesos(pendingCheckout.tendered);
+        if (Number.isSafeInteger(parsed)) checkoutBody.tendered_amount = parsed;
+      }
+    } else {
+      checkoutBody.tendered_amount = parsePesos(amountTenderedInput.value);
+    }
 
     const response = await apiFetch("/api/sales", {
       method: "POST",
@@ -393,11 +707,7 @@ async function handleCheckout() {
         "Content-Type": "application/json",
         "Idempotency-Key": pendingCheckout.key,
       },
-      body: JSON.stringify({
-        total_amount: totalCents,
-        tendered_amount: parsePesos(amountTenderedInput.value),
-        items: itemsPayload,
-      }),
+      body: JSON.stringify(checkoutBody),
     });
 
     const data = await response.json();
@@ -406,6 +716,7 @@ async function handleCheckout() {
         [400, 404, 409].includes(response.status) &&
         data.code !== "IDEMPOTENCY_CONFLICT"
       ) {
+        priceRejectionLock = true;
         pendingCheckout = null;
         sessionStorage.removeItem("storeease-checkout");
         // Refresh displayed prices after a definite rejection. No sale committed.
@@ -419,11 +730,12 @@ async function handleCheckout() {
           }));
           updateCartUI();
         }
+        checkoutBtn.disabled = true;
       }
       throw new Error(data.error || "Failed to record transaction.");
     }
 
-    // Always render the committed server snapshot, including price changes.
+    // Always render committed server snapshot
     cart = data.items.map((item) => ({
       product: {
         id: item.product_id,
@@ -434,7 +746,8 @@ async function handleCheckout() {
       quantity: item.quantity,
     }));
     totalCents = data.total_amount;
-    // Build Receipt on successful checkout capture
+
+    // Render receipt
     receiptItems.innerHTML = cart
       .map(
         (item) => `
@@ -446,20 +759,70 @@ async function handleCheckout() {
       )
       .join("");
 
-    const tenderedVal = amountTenderedInput.value.trim();
-    const tenderedCents = parsePesos(tenderedVal);
-    const changeCents = tenderedCents - totalCents;
+    const paymentTypeEl = document.getElementById("receipt-payment-type");
+    const tenderedRow = document.getElementById("receipt-tendered-row");
+    const changeRow = document.getElementById("receipt-change-row");
+    const debtorRow = document.getElementById("receipt-debtor-row");
+    const debtChargedRow = document.getElementById("receipt-debt-charged-row");
+    const debtBalanceRow = document.getElementById("receipt-debt-balance-row");
+
+    if (data.payment_type === "debt") {
+      const isShortage = (data.cash_paid || 0) > 0;
+      if (paymentTypeEl) {
+        paymentTypeEl.textContent = isShortage
+          ? `Cash Shortage + Debt`
+          : `Charge to Debt (Utang)`;
+      }
+      if (debtorRow) {
+        debtorRow.classList.remove("hidden");
+        const debtorNameEl = document.getElementById("receipt-debtor-name");
+        if (debtorNameEl) debtorNameEl.textContent = data.customer_name || "-";
+      }
+      if (tenderedRow) {
+        tenderedRow.style.display = "";
+        const tenderedEl = document.getElementById("receipt-tendered");
+        if (tenderedEl) tenderedEl.textContent = formatCurrency(data.cash_paid || 0);
+      }
+      if (changeRow) {
+        changeRow.style.display = "none";
+      }
+      if (debtChargedRow) {
+        debtChargedRow.classList.remove("hidden");
+        const debtChargedEl = document.getElementById("receipt-debt-charged");
+        if (debtChargedEl)
+          debtChargedEl.textContent = formatCurrency(
+            data.debt_amount !== undefined && data.debt_amount !== null
+              ? data.debt_amount
+              : totalCents - (data.cash_paid || 0),
+          );
+      }
+      if (debtBalanceRow) {
+        debtBalanceRow.classList.remove("hidden");
+        const debtBalEl = document.getElementById("receipt-debt-balance");
+        if (debtBalEl) debtBalEl.textContent = formatCurrency(data.customer_balance || 0);
+      }
+    } else {
+      if (paymentTypeEl) paymentTypeEl.textContent = "Cash";
+      if (debtorRow) debtorRow.classList.add("hidden");
+      if (debtChargedRow) debtChargedRow.classList.add("hidden");
+      if (debtBalanceRow) debtBalanceRow.classList.add("hidden");
+      if (tenderedRow) tenderedRow.style.display = "";
+      if (changeRow) changeRow.style.display = "";
+      const tenderedVal = amountTenderedInput.value.trim();
+      const tenderedCents = parsePesos(tenderedVal);
+      const changeCents = tenderedCents - totalCents;
+      document.getElementById("receipt-tendered").textContent =
+        formatCurrency(tenderedCents);
+      document.getElementById("receipt-change").textContent =
+        formatCurrency(changeCents);
+    }
 
     receiptTotal.textContent = formatCurrency(totalCents);
-    document.getElementById("receipt-tendered").textContent =
-      formatCurrency(tenderedCents);
-    document.getElementById("receipt-change").textContent =
-      formatCurrency(changeCents);
-
-    // Show Receipt
     receiptModal.classList.remove("hidden");
     pendingCheckout = null;
+    priceRejectionLock = false;
     sessionStorage.removeItem("storeease-checkout");
+    if (window.debts?.reload) window.debts.reload();
     cart = [];
     updateCartUI();
   } catch (err) {
@@ -487,6 +850,7 @@ function hideError() {
 
 function updateQty(productId, newQty) {
   if (checkoutBusy || pendingCheckout || !Number.isSafeInteger(newQty)) return;
+  priceRejectionLock = false;
   if (newQty <= 0) {
     removeItem(productId);
     return;
@@ -500,6 +864,7 @@ function updateQty(productId, newQty) {
 
 function removeItem(productId) {
   if (checkoutBusy || pendingCheckout) return;
+  priceRejectionLock = false;
   cart = cart.filter((item) => item.product.id !== productId);
   updateCartUI();
 }
@@ -656,13 +1021,199 @@ toggleScannerBtn.addEventListener("click", () =>
 // --- Navigation Tab Switching ---
 
 function showStoreView(name) {
-  for (const view of ["pos", "inventory", "dashboard", "sales"]) {
-    document.getElementById(view + "-view").classList.toggle("hidden", view !== name);
-    document.getElementById("nav-" + view).classList.toggle("active", view === name);
+  for (const view of ["pos", "inventory", "dashboard", "sales", "debts"]) {
+    const v = document.getElementById(view + "-view");
+    const n = document.getElementById("nav-" + view);
+    if (v?.classList) {
+      if (typeof v.classList.toggle === "function") v.classList.toggle("hidden", view !== name);
+      else if (view !== name) v.classList.add("hidden");
+      else v.classList.remove("hidden");
+    }
+    if (n?.classList) {
+      if (typeof n.classList.toggle === "function") n.classList.toggle("active", view === name);
+      else if (view === name) n.classList.add("active");
+      else n.classList.remove("active");
+    }
   }
-  if (name === "pos") barcodeInput.focus();
+  if (name === "pos") barcodeInput?.focus?.();
   else stopCameraScanner();
 }
+
+async function openShortageModal(totalCents, cashCents, shortageCents) {
+  activeShortageTotal = totalCents;
+  activeShortageCash = cashCents;
+  activeShortageAmount = shortageCents;
+  selectedShortageDebtor = null;
+
+  if (shortageTotalDue) shortageTotalDue.textContent = formatCurrency(totalCents);
+  if (shortageCashPaid) shortageCashPaid.textContent = formatCurrency(cashCents);
+  if (shortageAmountDue) shortageAmountDue.textContent = formatCurrency(shortageCents);
+
+  if (shortageCustomerInput) {
+    shortageCustomerInput.value = "";
+  }
+  if (shortageMatchBanner) {
+    shortageMatchBanner.className = "shortage-match-banner hidden";
+    shortageMatchBanner.innerHTML = "";
+  }
+  if (confirmShortageBtn) confirmShortageBtn.disabled = true;
+
+  if (shortageModal) shortageModal.classList.remove("hidden");
+
+  await loadShortageDebtors();
+
+  if (shortageCustomerInput) shortageCustomerInput.focus();
+}
+
+function closeShortageModal() {
+  if (shortageModal) shortageModal.classList.add("hidden");
+  selectedShortageDebtor = null;
+  barcodeInput.focus();
+}
+
+async function loadShortageDebtors() {
+  try {
+    const res = await apiFetch("/api/debts/customers");
+    if (!res.ok) return;
+    const data = await res.json();
+    shortageDebtorsCache = Array.isArray(data) ? data : [];
+    renderShortageDebtorsList(shortageDebtorsCache);
+  } catch (err) {
+    console.error("Error loading debtors for shortage:", err);
+  }
+}
+
+function renderShortageDebtorsList(list) {
+  if (!shortageDebtorsList) return;
+  if (shortageDebtorsCount) shortageDebtorsCount.textContent = list.length;
+
+  if (list.length === 0) {
+    shortageDebtorsList.innerHTML = `<div style="padding: 0.75rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No existing debtors found. Type customer name above to add.</div>`;
+    return;
+  }
+
+  shortageDebtorsList.innerHTML = list
+    .map((d) => {
+      const isSelected = selectedShortageDebtor && selectedShortageDebtor.id === d.id;
+      return `
+        <div class="shortage-debtor-card ${isSelected ? "selected" : ""}" data-id="${d.id}">
+          <span class="shortage-debtor-card-name">${escapeHTML(d.name)}</span>
+          <span class="shortage-debtor-card-balance">Current: ${formatCurrency(d.balance)}</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function updateShortageCustomerMatch() {
+  if (!shortageCustomerInput) return;
+  const val = shortageCustomerInput.value.trim();
+  const lowerVal = val.toLowerCase();
+
+  const filtered = lowerVal
+    ? shortageDebtorsCache.filter((d) => d.name.toLowerCase().includes(lowerVal))
+    : shortageDebtorsCache;
+  renderShortageDebtorsList(filtered);
+
+  if (!val) {
+    selectedShortageDebtor = null;
+    if (shortageMatchBanner) {
+      shortageMatchBanner.className = "shortage-match-banner hidden";
+      shortageMatchBanner.innerHTML = "";
+    }
+    if (confirmShortageBtn) confirmShortageBtn.disabled = true;
+    return;
+  }
+
+  // Exact case-insensitive match check
+  const exactMatch = shortageDebtorsCache.find(
+    (d) => d.name.trim().toLowerCase() === lowerVal,
+  );
+
+  if (exactMatch) {
+    selectedShortageDebtor = exactMatch;
+    const newBal = exactMatch.balance + activeShortageAmount;
+    if (shortageMatchBanner) {
+      shortageMatchBanner.className = "shortage-match-banner is-existing";
+      shortageMatchBanner.innerHTML = `
+        <strong>Existing Customer:</strong> ${escapeHTML(exactMatch.name)}<br>
+        Current Debt: <strong>${formatCurrency(exactMatch.balance)}</strong> → New Balance: <strong>${formatCurrency(newBal)}</strong><br>
+        <span style="font-size: 0.78rem;">✓ Account will be updated. No duplicate will be created.</span>
+      `;
+    }
+    if (confirmShortageBtn) confirmShortageBtn.disabled = false;
+  } else {
+    selectedShortageDebtor = null;
+    if (shortageMatchBanner) {
+      shortageMatchBanner.className = "shortage-match-banner is-new";
+      shortageMatchBanner.innerHTML = `
+        <strong>+ New Customer:</strong> "${escapeHTML(val)}"<br>
+        Initial Debt: <strong>${formatCurrency(activeShortageAmount)}</strong>
+      `;
+    }
+    if (confirmShortageBtn) confirmShortageBtn.disabled = false;
+  }
+}
+
+if (shortageCustomerInput) {
+  shortageCustomerInput.addEventListener("input", updateShortageCustomerMatch);
+  shortageCustomerInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      if (confirmShortageBtn && !confirmShortageBtn.disabled) {
+        confirmShortageCheckout();
+      }
+    } else if (e.key === "Escape") {
+      closeShortageModal();
+    }
+  });
+}
+
+if (shortageDebtorsList) {
+  shortageDebtorsList.addEventListener("click", (e) => {
+    const card = e.target.closest(".shortage-debtor-card");
+    if (!card) return;
+    const id = Number(card.dataset.id);
+    const debtor = shortageDebtorsCache.find((d) => d.id === id);
+    if (debtor) {
+      selectedShortageDebtor = debtor;
+      if (shortageCustomerInput) {
+        shortageCustomerInput.value = debtor.name;
+      }
+      updateShortageCustomerMatch();
+    }
+  });
+}
+
+async function confirmShortageCheckout() {
+  if (!shortageCustomerInput) return;
+  const nameVal = shortageCustomerInput.value.trim();
+  if (!nameVal) return;
+
+  const checkoutOpts = {
+    payment_type: "debt",
+    tendered_amount: activeShortageCash,
+  };
+
+  if (selectedShortageDebtor) {
+    checkoutOpts.customer_id = selectedShortageDebtor.id;
+  } else {
+    checkoutOpts.customer_name = nameVal;
+  }
+
+  closeShortageModal();
+  return await performCheckout(checkoutOpts);
+}
+
+if (confirmShortageBtn) confirmShortageBtn.addEventListener("click", confirmShortageCheckout);
+if (cancelShortageBtn) cancelShortageBtn.addEventListener("click", closeShortageModal);
+if (closeShortageModalX) closeShortageModalX.addEventListener("click", closeShortageModal);
+
+window.apiFetch = apiFetch;
+window.formatCurrency = formatCurrency;
+window.parsePesos = parsePesos;
+window.escapeHTML = escapeHTML;
+window.showStoreView = showStoreView;
+window.showError = showError;
 
 navPos.addEventListener("click", () => showStoreView("pos"));
 navInventory.addEventListener("click", () => {
@@ -677,13 +1228,33 @@ navDashboard.addEventListener("click", () => {
 // --- Inventory Manager AJAX CRUD Operations ---
 
 // Load all products from SQLite via backend REST API
+async function fetchProductsList() {
+  try {
+    const response = await apiFetch("/api/products");
+    if (!response.ok) return;
+    const data = await response.json();
+    inventoryProducts = Array.isArray(data)
+      ? data
+      : data && typeof data === "object" && data.id
+        ? [data]
+        : [];
+  } catch (err) {
+    console.error("Products fetch error:", err);
+  }
+}
+
 async function loadInventory() {
   try {
     const response = await apiFetch("/api/products");
     if (!response.ok) {
       throw new Error("Failed to retrieve inventory list.");
     }
-    inventoryProducts = await response.json();
+    const data = await response.json();
+    inventoryProducts = Array.isArray(data)
+      ? data
+      : data && typeof data === "object" && data.id
+        ? [data]
+        : [];
     renderInventoryTable();
   } catch (err) {
     inventoryBody.innerHTML = "";
@@ -712,6 +1283,24 @@ function renderInventoryTable() {
     );
   });
 
+  if (query) {
+    filtered.sort((a, b) => {
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+      const aStarts = aName.startsWith(query);
+      const bStarts = bName.startsWith(query);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+
+      const aWordStarts = aName.split(/\s+/).some((w) => w.startsWith(query));
+      const bWordStarts = bName.split(/\s+/).some((w) => w.startsWith(query));
+      if (aWordStarts && !bWordStarts) return -1;
+      if (!aWordStarts && bWordStarts) return 1;
+
+      return aName.localeCompare(bName);
+    });
+  }
+
   // Update product quantity badge
   inventoryCountBadge.textContent =
     `${inventoryProducts.length} Product` +
@@ -727,18 +1316,25 @@ function renderInventoryTable() {
         const formattedPrice = "₱" + (p.price / 100).toFixed(2);
         return `
                 <tr>
-                    <td style="font-family: monospace; font-size: 0.95rem; font-weight: 500;">${escapeHTML(p.barcode_string)}</td>
-                    <td>${escapeHTML(p.name)}</td>
-                    <td style="font-weight: 600;">${formattedPrice}<br><small>Stock: ${p.stock === null ? "Untracked" : p.stock}</small> ${stockStatus(p) ? `<span class="stock-badge">${stockStatus(p)}</span>` : ""} <button ${currentRole !== "admin" ? "hidden" : ""} class="action-btn" data-action="stock" data-id="${p.id}" title="Adjust stock">±</button></td>
+                    <td><span class="barcode-badge">${highlightMatch(p.barcode_string, query)}</span></td>
+                    <td><span class="product-name-text">${highlightMatch(p.name, query)}</span></td>
+                    <td class="price-text">${formattedPrice}</td>
+                    <td>
+                        <div class="stock-info-group">
+                            <span class="stock-amount">${p.stock === null ? "Untracked" : `${p.stock} units`}</span>
+                            ${stockStatus(p) ? `<span class="stock-badge ${stockStatus(p) === 'Out of Stock' ? 'out-of-stock' : 'low-stock'}">${stockStatus(p)}</span>` : ""}
+                            <button ${currentRole !== "admin" ? "hidden" : ""} class="action-btn stock-btn" data-action="stock" data-id="${p.id}" title="Adjust stock">±</button>
+                        </div>
+                    </td>
                     <td>
                         <div class="action-btn-group" ${currentRole !== "admin" ? "hidden" : ""}>
-                            <button class="nav-tab" data-action="history" data-id="${p.id}">Stock History</button>
-                            ${p.stock !== null ? `<button class="nav-tab" data-action="reorder" data-id="${p.id}">Reorder Level: ${p.reorder_level ?? "Off"}</button>` : ""}
+                            <button class="btn-subtle" data-action="history" data-id="${p.id}" title="Stock History">History</button>
+                            ${p.stock !== null ? `<button class="btn-subtle" data-action="reorder" data-id="${p.id}" title="Set reorder level">Reorder: ${p.reorder_level ?? "Off"}</button>` : ""}
                             <button class="action-btn edit-btn" data-action="edit" data-id="${p.id}" title="Edit Product">
-                                <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                                <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                             </button>
                             <button class="action-btn delete-btn-inv" data-action="deactivate" data-id="${p.id}" title="Delete Product">
-                                <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                                <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                             </button>
                         </div>
                     </td>
@@ -1063,10 +1659,13 @@ if (pendingCheckout) {
     "A checkout needs confirmation. Retry checkout to retrieve its result before changing the cart.",
   );
 }
-document.getElementById("logout-btn").addEventListener("click", () => {
-  apiToken = "";
-  location.reload();
-});
+const logoutBtn = document.getElementById("logout-btn");
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", () => {
+    apiToken = "";
+    location.reload();
+  });
+}
 window.addEventListener("offline", () =>
   showError("Offline. Your cart is retained; retry checkout when connected."),
 );

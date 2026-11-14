@@ -18,5 +18,14 @@ module.exports = (db) => {
   router.get("/sales/:id", controller.receipt);
   router.post("/sales", controller.checkout);
   router.get("/analytics", requireAdmin, controller.analytics);
+  router.get("/debts/summary", controller.debtsSummary);
+  router.get("/debts/customers", controller.customers);
+  router.get("/debts/customers/:id", controller.customer);
+  router.post("/debts/customers", controller.createCustomer);
+  router.put("/debts/customers/:id", requireAdmin, controller.updateCustomer);
+  router.delete("/debts/customers/:id", requireAdmin, controller.deleteCustomer);
+  router.get("/debts/customers/:id/transactions", controller.customerTransactions);
+  router.post("/debts/customers/:id/debt", controller.addDebt);
+  router.post("/debts/customers/:id/payment", controller.recordPayment);
   return router;
 };

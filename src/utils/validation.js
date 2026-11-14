@@ -47,4 +47,24 @@ function product(body) {
     price: money(body.price),
   };
 }
-module.exports = { ApiError, fail, integer, id, text, money, product };
+function optionalText(value, label, max) {
+  if (value === null || value === undefined) return null;
+  const str = String(value).trim();
+  if (!str) return null;
+  return text(str, label, max);
+}
+function customer(body) {
+  if (!body || typeof body !== "object") fail("Invalid customer data");
+  let initialDebt = 0;
+  if (body.initial_debt !== undefined && body.initial_debt !== null && String(body.initial_debt).trim() !== "") {
+    initialDebt = money(body.initial_debt);
+  }
+  return {
+    name: text(body.name, "customer name", 200),
+    phone: optionalText(body.phone, "phone", 50),
+    address: optionalText(body.address, "address", 255),
+    notes: optionalText(body.notes, "notes", 500),
+    initial_debt: initialDebt,
+  };
+}
+module.exports = { ApiError, fail, integer, id, text, optionalText, money, product, customer };

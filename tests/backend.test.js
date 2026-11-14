@@ -443,3 +443,91 @@ test("analytics refuses aggregate values beyond safe JSON integers", async (t) =
     /supported range/,
   );
 });
+
+test("debt monitoring: customer creation, debt accumulation, payments, ledger, and debt checkout", async (t) => {
+  const { request, service } = await fixture(t);
+  const p = service.create(product());
+
+  // 1. Create a customer with initial debt
+  const res1 = await request("/debts/customers", "POST", {
+    name: "Aling Nena",
+    phone: "09123456789",
+    address: "Block 1 Lot 2",
+    notes: "Neighbor",
+    initial_debt: "50.00",
+  });
+  assert.equal(res1.status, 200);
+  assert.equal(res1.body.name, "Aling Nena");
+  assert.equal(res1.body.balance, 5000); // ₱50.00 = 5000 cents
+
+  const customerId = res1.body.id;
+
+  // 2. Summary reflects initial debt
+  const sum1 = await request("/debts/summary");
+  assert.equal(sum1.body.total_debt, 5000);
+  assert.equal(sum1.body.active_debtors, 1);
+  assert.equal(sum1.body.total_customers, 1);
+
+  // 3. Manual Add Debt
+  const addRes = await request(`/debts/customers/${customerId}/debt`, "POST", {
+    amount: "25.50",
+    notes: "3 instant noodles",
+  });
+  assert.equal(addRes.status, 200);
+  assert.equal(addRes.body.balance, 7550); // 5000 + 2550 = 7550
+
+  // 4. POS Sale Checkout on Debt
+  const debtCheckout = await request(
+    "/sales",
+    "POST",
+    {
+      items: [{ product_id: p.id, quantity: 2 }],
+      payment_type: "debt",
+      customer_id: customerId,
+    },
+    { "idempotency-key": "debt-sale-key-1" },
+  );
+  assert.equal(debtCheckout.status, 200);
+  assert.equal(debtCheckout.body.success, true);
+  // Product price is 1205, quantity 2 = 2410
+  const cAfterSale = await request(`/debts/customers/${customerId}`);
+  assert.equal(cAfterSale.body.balance, 7550 + 2410); // 9960
+
+  // 5. Payment towards debt
+  const payRes = await request(`/debts/customers/${customerId}/payment`, "POST", {
+    amount: "40.00",
+    notes: "Partial payment",
+  });
+  assert.equal(payRes.status, 200);
+  assert.equal(payRes.body.balance, 9960 - 4000); // 5960
+
+  // 6. Overpayment is rejected
+  const overpay = await request(`/debts/customers/${customerId}/payment`, "POST", {
+    amount: "999.00",
+  });
+  assert.equal(overpay.status, 400);
+
+  // 7. Deletion rejected when balance > 0
+  const delBlocked = await request(`/debts/customers/${customerId}`, "DELETE");
+  assert.equal(delBlocked.status, 400);
+
+  // 8. Transactions ledger
+  const txs = await request(`/debts/customers/${customerId}/transactions`);
+  assert.equal(txs.status, 200);
+  assert.equal(txs.body.entries.length, 4); // initial debt, manual debt, POS sale, payment
+
+  // 9. Full settlement
+  const settle = await request(`/debts/customers/${customerId}/payment`, "POST", {
+    amount: "59.60",
+    notes: "Full payment",
+  });
+  assert.equal(settle.body.balance, 0);
+
+  const sum2 = await request("/debts/summary");
+  assert.equal(sum2.body.total_debt, 0);
+  assert.equal(sum2.body.active_debtors, 0);
+
+  // 10. Deletion allowed when balance === 0
+  const delAllowed = await request(`/debts/customers/${customerId}`, "DELETE");
+  assert.equal(delAllowed.status, 200);
+});

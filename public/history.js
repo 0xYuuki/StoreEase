@@ -58,29 +58,90 @@ async function showHistoricalReceipt(id) {
   const request = ++receiptRequest;
   const status = historyElement("receipt-status");
   historicalReceipt.hidden = true;
-  status.textContent = "Loading receipt…";
+  if (status) status.textContent = "Loading receipt…";
   try {
     const receipt = await historyJson("/api/sales/" + encodeURIComponent(id));
     if (request !== receiptRequest) return;
     const title = historyElement("historical-receipt-title");
-    title.textContent = "Receipt #" + receipt.sale_id;
-    historyElement("historical-receipt-date").textContent =
-      manilaDateTime.format(new Date(receipt.timestamp)) + " (Manila)";
-    historyElement("historical-receipt-items").innerHTML = receipt.items.map((item) => `
-      <li>
-        <span>${escapeHTML(item.product_name)}</span>
-        <span>${item.quantity} × ${formatCurrency(item.price)}</span>
-        <strong>${formatCurrency(item.line_total)}</strong>
-      </li>`).join("");
-    historyElement("historical-receipt-total").textContent =
-      "Total " + formatCurrency(receipt.total_amount);
+    if (title) title.textContent = "Receipt #" + receipt.sale_id;
+    const dateEl = historyElement("historical-receipt-date");
+    if (dateEl) {
+      dateEl.textContent =
+        manilaDateTime.format(new Date(receipt.timestamp)) + " (Manila)";
+    }
+    const itemsEl = historyElement("historical-receipt-items");
+    if (itemsEl) {
+      itemsEl.innerHTML = receipt.items
+        .map(
+          (item) => `
+        <div class="receipt-row">
+          <span>${item.quantity}x ${escapeHTML(item.product_name)}</span>
+          <span>${formatCurrency(item.line_total)}</span>
+        </div>`,
+        )
+        .join("");
+    }
+    const totalEl = historyElement("historical-receipt-total");
+    if (totalEl) totalEl.textContent = formatCurrency(receipt.total_amount);
+
+    const paymentType = historyElement("historical-receipt-payment-type");
+    const debtorRow = historyElement("historical-receipt-debtor-row");
+    const debtorName = historyElement("historical-receipt-debtor-name");
+    const debtChargedRow = historyElement("historical-receipt-debt-charged-row");
+    const debtCharged = historyElement("historical-receipt-debt-charged");
+    const debtBalRow = historyElement("historical-receipt-debt-balance-row");
+    const debtBal = historyElement("historical-receipt-debt-balance");
+
+    if (receipt.payment_type === "debt") {
+      const isShortage = receipt.cash_paid > 0;
+      if (paymentType) {
+        paymentType.textContent = isShortage ? "Cash Shortage + Debt" : "Debt (Utang)";
+      }
+      if (debtorRow && debtorName) {
+        debtorRow.classList.remove("hidden");
+        debtorName.textContent = receipt.customer_name || "-";
+      }
+      if (debtChargedRow && debtCharged) {
+        debtChargedRow.classList.remove("hidden");
+        debtCharged.textContent = formatCurrency(receipt.debt_amount ?? receipt.total_amount);
+      }
+      if (debtBalRow && debtBal) {
+        debtBalRow.classList.remove("hidden");
+        debtBal.textContent = formatCurrency(receipt.customer_balance || 0);
+      }
+    } else {
+      if (paymentType) paymentType.textContent = "Cash";
+      if (debtorRow) debtorRow.classList.add("hidden");
+      if (debtChargedRow) debtChargedRow.classList.add("hidden");
+      if (debtBalRow) debtBalRow.classList.add("hidden");
+    }
+
     historicalReceipt.hidden = false;
-    status.textContent = "";
-    if (!historyElement("sales-view").classList.contains("hidden")) title.focus();
+    if (status) status.textContent = "";
   } catch (error) {
-    if (request === receiptRequest) status.textContent = error.message;
+    if (request === receiptRequest && status) status.textContent = error.message;
   }
 }
+
+function closeHistoricalReceipt() {
+  if (historicalReceipt) historicalReceipt.hidden = true;
+}
+
+historyElement("close-historical-receipt-x")?.addEventListener(
+  "click",
+  closeHistoricalReceipt,
+);
+historyElement("close-historical-receipt-btn")?.addEventListener(
+  "click",
+  closeHistoricalReceipt,
+);
+if (historicalReceipt) {
+  historicalReceipt.addEventListener("click", (e) => {
+    if (e.target === historicalReceipt) closeHistoricalReceipt();
+  });
+}
+
+window.showHistoricalReceipt = showHistoricalReceipt;
 
 historyElement("nav-sales").addEventListener("click", () => {
   showStoreView("sales");

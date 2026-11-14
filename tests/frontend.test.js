@@ -201,3 +201,166 @@ test("failed network checkout retains key and cart for retry", async (t) => {
   await run("handleCheckout()");
   assert.equal(run("pendingCheckout.key"), key);
 });
+test("product search is case-insensitive, prioritizes first-letter matches and generates preview", () => {
+  const { run, e } = browser();
+  run(`inventoryProducts = [
+    { id: 1, name: "Egg", barcode_string: "001", price: 100, stock: 10 },
+    { id: 2, name: "Hotdog", barcode_string: "002", price: 200, stock: 5 },
+    { id: 3, name: "Cheese Dog", barcode_string: "003", price: 250, stock: 2 }
+  ]`);
+
+  // Lowercase first letter 'e'
+  e("manual-barcode").value = "e";
+  run("updateSearchPreview()");
+  assert.equal(run("previewMatches[0].name"), "Egg");
+  assert.ok(e("search-preview-dropdown").innerHTML.includes("search-match"));
+  assert.ok(e("search-preview-dropdown").innerHTML.includes("<mark class=\"search-match\">E</mark>gg"));
+
+  // Uppercase first letter 'E'
+  e("manual-barcode").value = "E";
+  run("updateSearchPreview()");
+  assert.equal(run("previewMatches[0].name"), "Egg");
+
+  // First letter 'h' matches 'Hotdog'
+  e("manual-barcode").value = "h";
+  run("updateSearchPreview()");
+  assert.equal(run("previewMatches[0].name"), "Hotdog");
+
+  // Uppercase 'H' matches 'Hotdog'
+  e("manual-barcode").value = "H";
+  run("updateSearchPreview()");
+  assert.equal(run("previewMatches[0].name"), "Hotdog");
+
+  // Enter adds the top preview match to cart
+  run("manualBarcode.value = 'e'; updateSearchPreview()");
+  e("manual-barcode").listeners.keydown({ key: "Enter" });
+  assert.equal(run("cart.length"), 1);
+  assert.equal(run("cart[0].product.name"), "Egg");
+});
+
+test("cash shortage automatically prompts shortage modal with debtor matching and updates existing debtor without duplicate", async (t) => {
+  const { run, e, calls } = browser(t);
+
+  // Setup product in cart: ₱50.00
+  run("addToCart({ id: 1, name: 'Rice 1kg', barcode_string: '001', price: 5000 })");
+
+  // Cashier tenders ₱20.00, so shortage is ₱30.00
+  e("amount-tendered").value = "20.00";
+  run("calculateChange()");
+  assert.equal(e("summary-change").textContent, "-₱30.00");
+  assert.equal(e("checkout-btn").textContent, "Complete Sale (Short)");
+
+  // Mock debtor list returned from backend
+  run(`apiFetch = async (url, opts) => {
+    if (url === '/api/debts/customers') {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 10, name: 'Juan dela Cruz', balance: 1500 }]
+      };
+    }
+    if (url === '/api/sales') {
+      const body = JSON.parse(opts.body);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sale_id: 99,
+          total_amount: body.total_amount,
+          payment_type: 'debt',
+          customer_id: body.customer_id,
+          customer_name: 'Juan dela Cruz',
+          customer_balance: 4500, // 1500 + 3000
+          cash_paid: body.tendered_amount,
+          debt_amount: 3000,
+          items: [{ product_id: 1, product_name: 'Rice 1kg', barcode_string: '001', price: 5000, quantity: 1 }]
+        })
+      };
+    }
+    return { ok: true, json: async () => [] };
+  }`);
+
+  // Cashier clicks Complete Sale with shortage
+  await run("handleCheckout()");
+
+  // Shortage modal pops up automatically!
+  assert.equal(e("shortage-modal").classList.contains("hidden"), false);
+  assert.equal(e("shortage-total-due").textContent, "₱50.00");
+  assert.equal(e("shortage-cash-paid").textContent, "₱20.00");
+  assert.equal(e("shortage-amount-due").textContent, "₱30.00");
+
+  // Cashier enters debtor name in different casing: "juan dela cruz"
+  e("shortage-customer-input").value = "juan dela cruz";
+  run("updateShortageCustomerMatch()");
+
+  // Existing customer is matched case-insensitively, preventing duplicates!
+  assert.equal(run("selectedShortageDebtor.id"), 10);
+  assert.equal(run("selectedShortageDebtor.name"), "Juan dela Cruz");
+  assert.ok(e("shortage-match-banner").innerHTML.includes("Existing Customer"));
+  assert.ok(e("shortage-match-banner").innerHTML.includes("No duplicate will be created"));
+  assert.equal(e("confirm-shortage-btn").disabled, false);
+
+  // Confirming shortage checkout submits sale linked to existing debtor
+  await run("confirmShortageCheckout()");
+
+  // Modal closes and receipt modal displays shortage & debt breakdown
+  assert.equal(e("shortage-modal").classList.contains("hidden"), true);
+  assert.equal(e("receipt-total").textContent, "₱50.00");
+  assert.equal(e("receipt-debtor-name").textContent, "Juan dela Cruz");
+  assert.equal(e("receipt-debt-charged").textContent, "₱30.00");
+  assert.equal(e("receipt-debt-balance").textContent, "₱45.00");
+  assert.equal(run("cart.length"), 0);
+});
+
+test("debt status tabs filter active debts vs fully paid debtors and display counts", async (t) => {
+  const { run, e, context } = browser(t);
+  const debtsCode = fs.readFileSync("public/debts.js", "utf8");
+
+  run(`apiFetch = async (url) => {
+    if (url === '/api/debts/summary') {
+      return { ok: true, json: async () => ({ total_debt: 17000, active_debtors: 2, total_customers: 3 }) };
+    }
+    if (url === '/api/debts/customers') {
+      return {
+        ok: true,
+        json: async () => [
+          { id: 1, name: 'Aling Nena', balance: 5000 },
+          { id: 2, name: 'Mang Juan', balance: 0 },
+          { id: 3, name: 'Pedro Penduko', balance: 12000 }
+        ]
+      };
+    }
+    return { ok: true, json: async () => [] };
+  }; window.apiFetch = apiFetch;`);
+
+  // Run debts script in context
+  vm.runInContext(debtsCode, context);
+
+  // Load summary and debtors
+  await run("window.debts.reload()");
+
+  // Check tab count badges
+  assert.equal(e("count-active-debts").textContent, 2);
+  assert.equal(e("count-paid-debts").textContent, 1);
+  assert.equal(e("count-all-debts").textContent, 3);
+
+  // Default filter is 'active': should render only Aling Nena and Pedro Penduko (balance > 0)
+  assert.equal(e("debtors-count-badge").textContent, "2 Active Debtors");
+  assert.ok(e("debtors-table-body").innerHTML.includes("Aling Nena"));
+  assert.ok(e("debtors-table-body").innerHTML.includes("Pedro Penduko"));
+  assert.ok(!e("debtors-table-body").innerHTML.includes("Mang Juan"));
+
+  // Switch to 'paid' (Fully Paid) filter: should render only Mang Juan (balance === 0)
+  run("window.debts.setStatusFilter('paid')");
+  assert.equal(e("debtors-count-badge").textContent, "1 Fully Paid");
+  assert.ok(e("debtors-table-body").innerHTML.includes("Mang Juan"));
+  assert.ok(!e("debtors-table-body").innerHTML.includes("Aling Nena"));
+  assert.ok(!e("debtors-table-body").innerHTML.includes("Pedro Penduko"));
+
+  // Switch to 'all' filter: should render all 3 debtors
+  run("window.debts.setStatusFilter('all')");
+  assert.equal(e("debtors-count-badge").textContent, "3 Total Debtors");
+  assert.ok(e("debtors-table-body").innerHTML.includes("Aling Nena"));
+  assert.ok(e("debtors-table-body").innerHTML.includes("Mang Juan"));
+  assert.ok(e("debtors-table-body").innerHTML.includes("Pedro Penduko"));
+});

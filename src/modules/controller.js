@@ -22,4 +22,13 @@ module.exports = (service, analytics) => ({
   receipt: respond((req) => service.receipt(req.params.id)),
   reorder: respond((req) => service.reorder(req.params.id, req.body || {})),
   stockHistory: respond((req) => service.stockHistory(req.params.id, req.query.page)),
+  debtsSummary: respond(() => service.debtsSummary()),
+  customers: respond((req) => service.customers(req.query)),
+  customer: respond((req) => service.customer(req.params.id)),
+  createCustomer: respond((req) => service.createCustomer(req.body || {})),
+  updateCustomer: respond((req) => service.updateCustomer(req.params.id, req.body || {})),
+  deleteCustomer: respond((req) => service.deleteCustomer(req.params.id)),
+  customerTransactions: respond((req) => service.customerTransactions(req.params.id, req.query)),
+  addDebt: respond((req) => service.addDebt(req.params.id, req.body || {})),
+  recordPayment: respond((req) => service.recordPayment(req.params.id, req.body || {})),
 });

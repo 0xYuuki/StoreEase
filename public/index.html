@@ -4,131 +4,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grocery Counter</title>
+    <title>StoreEase POS</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
+    <!-- Top Navigation Bar -->
     <header class="main-navbar">
-        <div class="navbar-brand">Helen's Store</div>
-        <nav class="pos-navbar"><button id="logout-btn" class="nav-tab">Sign out</button>
+        <div class="navbar-brand-group">
+            <svg class="brand-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3zm7 17H5V8h14v12zm-7-8c-1.66 0-3-1.34-3-3H7c0 2.76 2.24 5 5 5s5-2.24 5-5h-2c0 1.66-1.34 3-3 3z"/>
+            </svg>
+            <span class="navbar-brand">StoreEase</span>
+        </div>
+
+        <nav class="pos-navbar" aria-label="Main navigation">
             <button id="nav-pos" class="nav-tab active">
-                <svg viewBox="0 0 24 24" class="nav-icon">
-                    <path
-                        d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" />
+                <svg viewBox="0 0 24 24" class="nav-icon" aria-hidden="true">
+                    <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" />
                 </svg>
-                Cart
+                <span>Cart</span>
             </button>
             <button id="nav-inventory" class="nav-tab">
-                <svg viewBox="0 0 24 24" class="nav-icon">
-                    <path
-                        d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z" />
+                <svg viewBox="0 0 24 24" class="nav-icon" aria-hidden="true">
+                    <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z" />
                 </svg>
-                Inventory
+                <span>Inventory</span>
             </button>
-            <button id="nav-sales" class="nav-tab">Sales History</button>
-            <button hidden id="nav-dashboard" class="nav-tab">
-                <svg viewBox="0 0 24 24" class="nav-icon">
-                    <path
-                        d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
+            <button id="nav-debts" class="nav-tab">
+                <svg viewBox="0 0 24 24" class="nav-icon" aria-hidden="true">
+                    <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
                 </svg>
-                Sales Chart
+                <span>Debts</span>
+            </button>
+            <button id="nav-sales" class="nav-tab">
+                <svg viewBox="0 0 24 24" class="nav-icon" aria-hidden="true">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
+                </svg>
+                <span>Sales History</span>
+            </button>
+            <button hidden id="nav-dashboard" class="nav-tab">
+                <svg viewBox="0 0 24 24" class="nav-icon" aria-hidden="true">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
+                </svg>
+                <span>Analytics</span>
             </button>
         </nav>
     </header>
 
-    <!-- Hidden but auto-focused input to capture scanner input -->
+    <!-- Hidden input to capture hardware barcode scanner keystrokes -->
     <input type="text" aria-label="Barcode scanner input" id="barcode-input" autocomplete="off" autofocus />
 
+    <!-- POS Section -->
     <div id="pos-view" class="view-section">
         <div class="app-container">
-            <!-- Main POS Area -->
+            <!-- Main POS Counter Area -->
             <main class="pos-main">
-                <header class="pos-header">
-                    <h1>Helen's Store</h1>
-                </header>
+                <!-- Barcode & Search Bar -->
+                <div class="pos-toolbar">
+                    <div class="search-input-group">
+                        <svg viewBox="0 0 24 24" class="input-icon" aria-hidden="true">
+                            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                        </svg>
+                        <input type="text" id="manual-barcode" placeholder="Scan barcode or search product by name..." autocomplete="off">
+                        <button type="button" id="manual-add-btn" class="toolbar-add-btn">Add to Cart</button>
+                    </div>
+                    <!-- Live Search Preview Dropdown -->
+                    <div id="search-preview-dropdown" class="search-preview-dropdown hidden" role="listbox" aria-label="Product search preview"></div>
+                </div>
 
-                <!-- Error Banner -->
+                <!-- Error Alert Banner -->
                 <div role="alert" id="error-banner" class="error-banner hidden">
                     <span class="error-icon">⚠️</span>
                     <span id="error-message">Item Not Found: Please scan again or enter manually.</span>
                 </div>
 
+                <!-- Cart Table -->
                 <div class="cart-container">
                     <table class="cart-table">
                         <thead>
                             <tr>
                                 <th>Item</th>
-                                <th>Qty</th>
-                                <th>Price</th>
-                                <th>Subtotal</th>
-                                <th style="width: 60px; text-align: center;">Actions</th>
+                                <th style="width: 140px;">Quantity</th>
+                                <th style="width: 120px;">Unit Price</th>
+                                <th style="width: 120px;">Subtotal</th>
+                                <th style="width: 50px; text-align: center;"></th>
                             </tr>
                         </thead>
                         <tbody id="cart-body">
-                            <!-- Cart items will be injected here -->
+                            <!-- Injected cart items -->
                         </tbody>
                     </table>
                     <div id="empty-cart-message" class="empty-cart">
-                        <p>Cart is empty. Scan an item to begin.</p>
+                        <svg class="empty-cart-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" />
+                        </svg>
+                        <p class="empty-cart-title">Cart is empty</p>
+                        <p class="empty-cart-desc">Scan an item or enter a barcode above to add products</p>
                     </div>
                 </div>
             </main>
 
-            <!-- Sidebar / Checkout Area -->
+            <!-- Sidebar / Checkout Panel -->
             <aside class="pos-sidebar">
                 <div class="summary-card">
-                    <h2>Transaction Summary</h2>
+                    <h2 class="sidebar-title">Order Summary</h2>
 
                     <div class="summary-row">
                         <span>Subtotal</span>
-                        <span id="summary-subtotal">₱0.00</span>
+                        <span id="summary-subtotal" class="amount-value">₱0.00</span>
                     </div>
                     <div class="summary-row total-row">
-                        <span>Total</span>
-                        <span id="summary-total">₱0.00</span>
+                        <span>Total Due</span>
+                        <span id="summary-total" class="total-value">₱0.00</span>
                     </div>
 
-                    <div class="payment-section">
-                        <div class="summary-row payment-row">
-                            <label for="amount-tendered" class="payment-label">Amount Tendered</label>
+                    <div class="payment-section" id="cash-payment-section">
+                        <div class="payment-field">
+                            <label for="amount-tendered" class="payment-label">Cash Tendered</label>
                             <div class="tendered-input-wrapper">
                                 <span class="price-prefix">₱</span>
                                 <input type="number" id="amount-tendered" min="0" step="0.01" placeholder="0.00" disabled>
                             </div>
                         </div>
-                        <div class="summary-row change-row">
-                            <span>Change</span>
+                        <div class="summary-row change-row" id="summary-change-row">
+                            <span id="summary-change-label">Change</span>
                             <span id="summary-change" class="change-amount">₱0.00</span>
                         </div>
                     </div>
 
                     <button id="checkout-btn" class="checkout-btn" disabled>
-                        Complete Checkout
+                        Complete Sale
                     </button>
                 </div>
 
-                <!-- Camera Scanner Card -->
+                <!-- Camera Scanner Box -->
                 <div class="camera-scanner-card">
-                    <h3>Barcode Scanner</h3>
+                    <div class="scanner-card-header">
+                        <h3>Camera Barcode Scanner</h3>
+                        <button id="toggle-scanner-btn" class="scanner-btn">Start Camera</button>
+                    </div>
                     <div id="scanner-container">
                         <div id="reader"></div>
-                        <button id="toggle-scanner-btn" class="scanner-btn">Start Camera Scanner</button>
-                    </div>
-                </div>
-
-                <!-- Manual Entry (Fallback for unreadable barcodes) -->
-                <div class="manual-entry-card">
-                    <h3>Search Items</h3>
-                    <div class="manual-input-group">
-                        <input type="text" id="manual-barcode" placeholder="Enter barcode...">
-                        <button id="manual-add-btn">Add</button>
                     </div>
                 </div>
             </aside>
         </div>
-    </div> <!-- Close #pos-view -->
+    </div>
 
     <!-- Inventory Section -->
     <div id="inventory-view" class="view-section hidden">
@@ -140,56 +163,198 @@
                         <span id="inventory-count-badge" class="count-badge">0 Products</span>
                     </div>
                     <button hidden id="add-product-btn" class="add-btn">
-                        <svg viewBox="0 0 24 24">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
                         </svg>
-                        Add New Product
+                        Add Product
                     </button>
                 </header>
 
                 <!-- Search and Filter Bar -->
                 <div class="inventory-filter-bar">
-                    <label><input type="checkbox" id="low-stock-only"> Low stock and out of stock only</label>
                     <div class="search-box">
-                        <svg viewBox="0 0 24 24" class="search-icon">
-                            <path
-                                d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                        <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true">
+                            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
                         </svg>
-                        <input type="text" id="inventory-search" placeholder="Search by name or barcode..."
-                            autocomplete="off">
+                        <input type="text" id="inventory-search" placeholder="Search by product name or barcode..." autocomplete="off">
                     </div>
+                    <label class="filter-checkbox-label">
+                        <input type="checkbox" id="low-stock-only">
+                        <span>Low &amp; out of stock only</span>
+                    </label>
                 </div>
+
+                <!-- Stock History Panel -->
                 <section id="stock-history-panel" class="history-panel" hidden aria-labelledby="stock-history-title">
-                    <h3 id="stock-history-title" tabindex="-1">Stock history</h3>
-                    <p id="stock-history-status" role="status"></p>
+                    <div class="panel-header">
+                        <h3 id="stock-history-title" tabindex="-1">Stock History</h3>
+                        <button type="button" class="panel-close-btn" onclick="document.getElementById('stock-history-panel').hidden = true;">&times;</button>
+                    </div>
+                    <p id="stock-history-status" role="status" class="status-msg"></p>
                     <ul id="stock-movements" class="history-list"></ul>
-                    <button type="button" id="stock-more" class="nav-tab" hidden>Load more</button>
+                    <button type="button" id="stock-more" class="load-more-btn" hidden>Load more</button>
                 </section>
 
                 <div class="inventory-table-wrapper">
                     <table class="inventory-table">
                         <thead>
                             <tr>
-                                <th>Barcode</th>
+                                <th style="width: 140px;">Barcode</th>
                                 <th>Product Name</th>
-                                <th>Unit Price</th>
-                                <th style="width: 150px; text-align: center;">Actions</th>
+                                <th style="width: 120px;">Price</th>
+                                <th style="width: 220px;">Stock Status</th>
+                                <th style="width: 180px; text-align: right;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="inventory-body">
-                            <!-- Loaded database products injected here -->
+                            <!-- Loaded database products -->
                         </tbody>
                     </table>
                 </div>
 
                 <div id="empty-inventory-message" class="empty-inventory hidden">
-                    <p>No products found in the database. Click 'Add New Product' to begin!</p>
+                    <p>No products found in the database. Click 'Add Product' to begin!</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Dashboard Section -->
+    <!-- Debts Monitoring Section -->
+    <div id="debts-view" class="view-section hidden">
+        <div class="debts-container">
+            <!-- Debt Summary KPI Cards -->
+            <div class="kpi-grid debt-kpi-grid">
+                <div class="kpi-card">
+                    <span class="kpi-label">Total Outstanding Debt</span>
+                    <span id="debt-kpi-total" class="kpi-value text-danger">₱0.00</span>
+                    <span class="kpi-subtext">Cumulative unpaid utang</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Active Debtors</span>
+                    <span id="debt-kpi-active-count" class="kpi-value">0</span>
+                    <span class="kpi-subtext">Customers with balance &gt; ₱0.00</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Total Customers</span>
+                    <span id="debt-kpi-total-customers" class="kpi-value">0</span>
+                    <span class="kpi-subtext">Registered customer accounts</span>
+                </div>
+            </div>
+
+            <!-- Debtors Table Card -->
+            <div class="inventory-card">
+                <header class="inventory-header">
+                    <div class="header-title-group">
+                        <h2>Debt Monitoring (Utang)</h2>
+                        <span id="debtors-count-badge" class="count-badge">0 Debtors</span>
+                    </div>
+                    <button type="button" id="add-debtor-btn" class="add-btn">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                        Add Debtor
+                    </button>
+                </header>
+
+                <!-- Search and Filter Bar -->
+                <div class="inventory-filter-bar">
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true">
+                            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                        </svg>
+                        <input type="text" id="debtor-search" placeholder="Search by debtor name..." autocomplete="off">
+                    </div>
+                    <div class="debt-status-tabs" role="group" aria-label="Filter debtors by status">
+                        <button type="button" class="debt-status-tab active" data-status="active" id="filter-debt-active">
+                            <span class="status-indicator-dot dot-active"></span>
+                            Active Debt
+                            <span class="status-tab-count" id="count-active-debts">0</span>
+                        </button>
+                        <button type="button" class="debt-status-tab" data-status="paid" id="filter-debt-paid">
+                            <span class="status-indicator-dot dot-paid"></span>
+                            Fully Paid
+                            <span class="status-tab-count" id="count-paid-debts">0</span>
+                        </button>
+                        <button type="button" class="debt-status-tab" data-status="all" id="filter-debt-all">
+                            All
+                            <span class="status-tab-count" id="count-all-debts">0</span>
+                        </button>
+                    </div>
+                </div>
+
+                <p id="debtors-status" role="status" class="status-msg"></p>
+
+                <div class="inventory-table-wrapper">
+                    <table class="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Debtor Name</th>
+                                <th style="width: 160px; text-align: right;">Outstanding Balance</th>
+                                <th style="width: 130px; text-align: center;">Status</th>
+                                <th style="width: 280px; text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="debtors-table-body">
+                            <!-- Dynamic debtor rows -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="empty-debtors-message" class="empty-inventory hidden">
+                    <p>No debtors found. Click 'Add Debtor' to record a customer.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sales History Section -->
+    <div id="sales-view" class="view-section hidden">
+        <div class="inventory-container">
+            <div class="inventory-card">
+                <header class="inventory-header">
+                    <div class="header-title-group">
+                        <h2>Sales History</h2>
+                    </div>
+                </header>
+
+                <div class="sales-toolbar">
+                    <form id="receipt-search" class="history-search-form">
+                        <label for="receipt-input" class="form-label">Receipt Search</label>
+                        <div class="input-with-button">
+                            <input id="receipt-input" name="receipt" inputmode="numeric" pattern="[1-9][0-9]*" placeholder="Receipt #" required>
+                            <button class="add-btn">Lookup</button>
+                        </div>
+                    </form>
+
+                    <form id="sales-filters" class="history-date-form" hidden>
+                        <div class="date-filter-group">
+                            <label class="form-label">Date Range (Manila)</label>
+                            <div class="date-inputs">
+                                <input type="date" name="from" required aria-label="From date">
+                                <span class="date-separator">to</span>
+                                <input type="date" name="to" required aria-label="To date">
+                                <button class="add-btn">Filter</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <p id="sales-status" role="status" class="status-msg"></p>
+
+                <ul id="sales-results" class="history-list sales-results"></ul>
+
+                <div class="pagination-bar" id="sales-pagination" hidden>
+                    <button type="button" class="pagination-btn" id="sales-prev">Previous</button>
+                    <span id="sales-page" class="page-indicator">Page 1</span>
+                    <button type="button" class="pagination-btn" id="sales-next">Next</button>
+                </div>
+
+                <p id="receipt-status" role="status" class="status-msg"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Dashboard Section -->
     <div id="dashboard-view" class="view-section hidden">
         <div class="dashboard-container">
             <!-- KPIs Grid -->
@@ -235,7 +400,7 @@
                                 <tr>
                                     <th>Item</th>
                                     <th>Qty Sold</th>
-                                    <th>Total Revenue</th>
+                                    <th style="text-align: right;">Total Revenue</th>
                                 </tr>
                             </thead>
                             <tbody id="popular-items-body">
@@ -256,7 +421,7 @@
         <div class="modal-content product-modal-content">
             <header class="modal-header">
                 <h2 id="product-modal-title">Add New Product</h2>
-                <button id="close-product-modal-btn" class="modal-close-x">&times;</button>
+                <button id="close-product-modal-btn" class="modal-close-x" aria-label="Close modal">&times;</button>
             </header>
             <form id="product-form" autocomplete="off">
                 <input type="hidden" id="form-product-id">
@@ -264,12 +429,10 @@
                 <div class="form-group">
                     <label for="form-product-barcode">Barcode / Scan Code</label>
                     <div class="input-with-button">
-                        <input type="text" id="form-product-barcode" required
-                            placeholder="Scan barcode or enter manually...">
+                        <input type="text" id="form-product-barcode" required placeholder="Scan barcode or enter manually...">
                         <button type="button" id="form-gen-barcode" title="Generate Random Barcode">
-                            <svg viewBox="0 0 24 24">
-                                <path
-                                    d="M19 8H5v10h14V8zm2-4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM9 16H7v-6h2v6zm4 0h-2v-6h2v6zm4 0h-2v-6h2v6z" />
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M19 8H5v10h14V8zm2-4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM9 16H7v-6h2v6zm4 0h-2v-6h2v6zm4 0h-2v-6h2v6z" />
                             </svg>
                         </button>
                     </div>
@@ -290,61 +453,266 @@
 
                 <div class="modal-form-actions">
                     <button type="button" id="cancel-product-btn" class="modal-btn cancel-btn">Cancel</button>
-                    <button type="submit" id="save-product-btn" class="modal-btn save-btn">Save Changes</button>
+                    <button type="submit" id="save-product-btn" class="modal-btn save-btn">Save Product</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Receipt Modal -->
-    <div id="receipt-modal" class="modal hidden">
-        <div class="modal-content" style="position: relative;">
-            <button id="cancel-receipt-btn" class="modal-close-x" style="position: absolute; top: 1rem; right: 1rem;"
-                title="Close completed receipt">&times;</button>
-            <div class="receipt">
-                <h2>Receipt</h2>
-                <div id="receipt-items"></div>
-                <div class="receipt-totals">
-                    <div class="receipt-row"><span>Total:</span> <span id="receipt-total"></span></div>
-                    <div class="receipt-row receipt-sub-row"><span>Amount Tendered:</span> <span id="receipt-tendered">₱0.00</span></div>
-                    <div class="receipt-row receipt-sub-row"><span>Change:</span> <span id="receipt-change">₱0.00</span></div>
+    <!-- Debtor Add/Edit Modal -->
+    <div id="debtor-modal" class="modal hidden">
+        <div class="modal-content product-modal-content">
+            <header class="modal-header">
+                <h2 id="debtor-modal-title">Add New Debtor</h2>
+                <button type="button" id="close-debtor-modal-btn" class="modal-close-x" aria-label="Close modal">&times;</button>
+            </header>
+            <form id="debtor-form" autocomplete="off">
+                <input type="hidden" id="form-debtor-id">
+
+                <div class="form-group">
+                    <label for="form-debtor-name">Customer Name *</label>
+                    <input type="text" id="form-debtor-name" required placeholder="e.g. Aling Nena, Mang Juan...">
                 </div>
-                <button id="close-receipt-btn" class="close-btn">New Transaction!</button>
+
+                <div class="form-group" id="form-debtor-initial-group">
+                    <label for="form-debtor-initial">Initial Debt Balance (₱)</label>
+                    <div class="price-input-wrapper">
+                        <span class="price-prefix">₱</span>
+                        <input type="number" id="form-debtor-initial" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="modal-form-actions">
+                    <button type="button" id="cancel-debtor-btn" class="modal-btn cancel-btn">Cancel</button>
+                    <button type="submit" id="save-debtor-btn" class="modal-btn save-btn">Save Debtor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Record Debt Payment Modal -->
+    <div id="debt-payment-modal" class="modal hidden">
+        <div class="modal-content product-modal-content">
+            <header class="modal-header">
+                <h2>Record Debt Payment</h2>
+                <button type="button" id="close-payment-modal-btn" class="modal-close-x" aria-label="Close modal">&times;</button>
+            </header>
+            <form id="debt-payment-form" autocomplete="off">
+                <input type="hidden" id="payment-debtor-id">
+                <div class="debt-info-banner">
+                    <span class="debt-info-name" id="payment-debtor-name">Customer Name</span>
+                    <div class="debt-info-balance-wrap">
+                        <span>Current Balance:</span>
+                        <strong id="payment-current-balance" class="text-danger">₱0.00</strong>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="payment-amount-header">
+                        <label for="payment-amount">Payment Amount (₱) *</label>
+                        <button type="button" id="pay-full-btn" class="pay-full-chip">Pay Full Balance</button>
+                    </div>
+                    <div class="price-input-wrapper">
+                        <span class="price-prefix">₱</span>
+                        <input type="number" id="payment-amount" step="0.01" min="0.01" required placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="payment-notes">Notes / Remarks (Optional)</label>
+                    <input type="text" id="payment-notes" placeholder="e.g. Partial cash payment, GCash...">
+                </div>
+
+                <div class="modal-form-actions">
+                    <button type="button" id="cancel-payment-btn" class="modal-btn cancel-btn">Cancel</button>
+                    <button type="submit" id="submit-payment-btn" class="modal-btn save-btn">Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Debt Modal -->
+    <div id="debt-add-modal" class="modal hidden">
+        <div class="modal-content product-modal-content">
+            <header class="modal-header">
+                <h2>Add Debt / Utang</h2>
+                <button type="button" id="close-add-debt-modal-btn" class="modal-close-x" aria-label="Close modal">&times;</button>
+            </header>
+            <form id="debt-add-form" autocomplete="off">
+                <input type="hidden" id="add-debt-debtor-id">
+                <div class="debt-info-banner">
+                    <span class="debt-info-name" id="add-debt-debtor-name">Customer Name</span>
+                    <div class="debt-info-balance-wrap">
+                        <span>Current Balance:</span>
+                        <strong id="add-debt-current-balance" class="text-danger">₱0.00</strong>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="add-debt-amount">Debt Amount (₱) *</label>
+                    <div class="price-input-wrapper">
+                        <span class="price-prefix">₱</span>
+                        <input type="number" id="add-debt-amount" step="0.01" min="0.01" required placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="add-debt-notes">Items / Reason *</label>
+                    <input type="text" id="add-debt-notes" required placeholder="e.g. 2 sardinas, 1 mantika">
+                </div>
+
+                <div class="modal-form-actions">
+                    <button type="button" id="cancel-add-debt-btn" class="modal-btn cancel-btn">Cancel</button>
+                    <button type="submit" id="submit-add-debt-btn" class="modal-btn save-btn">Add to Debt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Customer Ledger Modal (Pop-up) -->
+    <div id="debt-ledger-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="debt-ledger-title">
+        <div class="modal-content ledger-modal-content">
+            <header class="modal-header">
+                <div>
+                    <h2 id="debt-ledger-title">Customer Ledger</h2>
+                    <p id="debt-ledger-subtitle" class="panel-subtitle" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;"></p>
+                </div>
+                <button type="button" id="close-debt-ledger-btn" class="modal-close-x" aria-label="Close ledger modal">&times;</button>
+            </header>
+
+            <div class="ledger-balance-box">
+                <span>Current Outstanding Balance:</span>
+                <strong id="debt-ledger-balance" class="text-danger">₱0.00</strong>
+            </div>
+
+            <p id="debt-ledger-status" role="status" class="status-msg"></p>
+            <ul id="debt-ledger-list" class="history-list debt-ledger-list"></ul>
+
+            <div class="modal-form-actions" style="margin-top: 1.25rem;">
+                <button type="button" id="close-debt-ledger-footer-btn" class="modal-btn cancel-btn" style="width: 100%;">Close</button>
             </div>
         </div>
     </div>
 
+    <!-- Cash Shortage / Charge to Debt Modal (Pop-up) -->
+    <div id="shortage-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shortage-modal-title">
+        <div class="modal-content shortage-modal-content">
+            <header class="modal-header">
+                <div>
+                    <h2 id="shortage-modal-title">Cash Shortage - Charge to Debt</h2>
+                    <p class="panel-subtitle" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
+                        Tendered cash is insufficient. Select or enter the customer to record the debt.
+                    </p>
+                </div>
+                <button type="button" id="close-shortage-modal-x" class="modal-close-x" aria-label="Close modal">&times;</button>
+            </header>
+
+            <div class="shortage-breakdown-card">
+                <div class="shortage-breakdown-item">
+                    <span class="shortage-label">Total Due</span>
+                    <strong id="shortage-total-due" class="shortage-val">₱0.00</strong>
+                </div>
+                <div class="shortage-breakdown-sep">-</div>
+                <div class="shortage-breakdown-item">
+                    <span class="shortage-label">Cash Paid</span>
+                    <strong id="shortage-cash-paid" class="shortage-val text-success">₱0.00</strong>
+                </div>
+                <div class="shortage-breakdown-sep">=</div>
+                <div class="shortage-breakdown-item">
+                    <span class="shortage-label">Shortage (To Debt)</span>
+                    <strong id="shortage-amount-due" class="shortage-val text-danger">₱0.00</strong>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1rem;">
+                <label for="shortage-customer-input">Customer Name *</label>
+                <div class="search-input-group">
+                    <svg viewBox="0 0 24 24" class="input-icon" aria-hidden="true">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                    <input type="text" id="shortage-customer-input" placeholder="Type customer name to search or add..." autocomplete="off">
+                </div>
+                <div id="shortage-match-banner" class="shortage-match-banner hidden"></div>
+            </div>
+
+            <div class="shortage-list-section">
+                <div class="shortage-list-header">
+                    <span>Existing Debtors</span>
+                    <span id="shortage-debtors-count" class="count-badge">0</span>
+                </div>
+                <div id="shortage-debtors-list" class="shortage-debtors-list">
+                    <!-- Dynamic debtor items -->
+                </div>
+            </div>
+
+            <div class="modal-form-actions" style="margin-top: 1.25rem;">
+                <button type="button" id="cancel-shortage-btn" class="modal-btn cancel-btn">Cancel</button>
+                <button type="button" id="confirm-shortage-btn" class="modal-btn save-btn" disabled>Confirm & Record Debt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div id="receipt-modal" class="modal hidden">
+        <div class="modal-content receipt-modal-box">
+            <button id="cancel-receipt-btn" class="modal-close-x receipt-close-x" title="Close completed receipt">&times;</button>
+            <div class="receipt">
+                <div class="receipt-header">
+                    <h2>StoreEase</h2>
+                    <p class="receipt-sub">Official Sale Receipt</p>
+                </div>
+                <div id="receipt-items" class="receipt-items-container"></div>
+                <div class="receipt-totals">
+                    <div class="receipt-row"><span>Total:</span> <span id="receipt-total">₱0.00</span></div>
+                    <div class="receipt-row receipt-sub-row" id="receipt-payment-row"><span>Payment Method:</span> <span id="receipt-payment-type">Cash</span></div>
+                    <div class="receipt-row receipt-sub-row" id="receipt-tendered-row"><span>Amount Tendered:</span> <span id="receipt-tendered">₱0.00</span></div>
+                    <div class="receipt-row receipt-sub-row" id="receipt-change-row"><span>Change:</span> <span id="receipt-change">₱0.00</span></div>
+                    <div class="receipt-row receipt-sub-row hidden" id="receipt-debtor-row"><span>Customer:</span> <span id="receipt-debtor-name">-</span></div>
+                    <div class="receipt-row receipt-sub-row hidden" id="receipt-debt-charged-row"><span>Charged to Debt:</span> <span id="receipt-debt-charged">₱0.00</span></div>
+                    <div class="receipt-row receipt-sub-row hidden" id="receipt-debt-balance-row"><span>Updated Debt Balance:</span> <span id="receipt-debt-balance">₱0.00</span></div>
+                </div>
+                <button id="close-receipt-btn" class="close-btn">New Transaction</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Historical Receipt Modal (Pop-up) -->
+    <div id="historical-receipt" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="historical-receipt-title">
+        <div class="modal-content receipt-modal-box">
+            <button type="button" id="close-historical-receipt-x" class="modal-close-x receipt-close-x" aria-label="Close receipt">&times;</button>
+            <div class="receipt">
+                <div class="receipt-header">
+                    <h2>StoreEase</h2>
+                    <p class="receipt-sub" id="historical-receipt-title" tabindex="-1">Official Receipt</p>
+                    <p class="receipt-sub" id="historical-receipt-date"></p>
+                </div>
+                <div id="historical-receipt-items" class="receipt-items-container"></div>
+                <div class="receipt-totals">
+                    <div class="receipt-row"><span>Total:</span> <span id="historical-receipt-total">₱0.00</span></div>
+                    <div class="receipt-row receipt-sub-row" id="historical-receipt-payment-row"><span>Payment:</span> <span id="historical-receipt-payment-type">Cash</span></div>
+                    <div class="receipt-row receipt-sub-row hidden" id="historical-receipt-debtor-row"><span>Customer:</span> <span id="historical-receipt-debtor-name">-</span></div>
+                    <div class="receipt-row receipt-sub-row hidden" id="historical-receipt-debt-charged-row"><span>Charged to Debt:</span> <span id="historical-receipt-debt-charged">₱0.00</span></div>
+                    <div class="receipt-row receipt-sub-row hidden" id="historical-receipt-debt-balance-row"><span>Customer Balance:</span> <span id="historical-receipt-debt-balance">₱0.00</span></div>
+                </div>
+                <div class="modal-form-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                    <button type="button" class="add-btn print-btn" id="print-historical-receipt" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                        <svg viewBox="0 0 24 24" style="width: 15px; height: 15px; fill: currentColor;" aria-hidden="true">
+                            <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/>
+                        </svg>
+                        Print Receipt
+                    </button>
+                    <button type="button" id="close-historical-receipt-btn" class="close-btn" style="flex: 1;">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
-    <section id="sales-view" class="view-section hidden inventory-container" aria-labelledby="sales-heading">
-        <h2 id="sales-heading">Sales History</h2>
-        <form id="receipt-search" class="history-form">
-            <label>Receipt number <input name="receipt" inputmode="numeric" pattern="[1-9][0-9]*" required></label>
-            <button class="add-btn">Find receipt</button>
-        </form>
-        <form id="sales-filters" class="history-form" hidden>
-            <label>From <input type="date" name="from" required></label>
-            <label>To <input type="date" name="to" required></label>
-            <button class="add-btn">Show sales</button>
-        </form>
-        <p id="sales-status" role="status"></p>
-        <ul id="sales-results" class="history-list sales-results"></ul>
-        <div class="history-form" id="sales-pagination" hidden>
-            <button type="button" class="nav-tab" id="sales-prev">Previous</button>
-            <span id="sales-page"></span>
-            <button type="button" class="nav-tab" id="sales-next">Next</button>
-        </div>
-        <p id="receipt-status" role="status"></p>
-        <article id="historical-receipt" class="history-panel" hidden>
-            <h3 id="historical-receipt-title" tabindex="-1"></h3>
-            <p id="historical-receipt-date"></p>
-            <ul id="historical-receipt-items" class="history-list"></ul>
-            <p id="historical-receipt-total"></p>
-            <button type="button" class="add-btn" id="print-historical-receipt">Print Receipt</button>
-        </article>
-    </section>
     <script src="app.js"></script>
     <script src="history.js"></script>
+    <script src="debts.js"></script>
 </body>
 
 </html>
