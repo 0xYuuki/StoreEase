@@ -28,7 +28,8 @@ void main() {
     test('Initializes tables and seeds default starter catalog', () async {
       final products = await dbService.getProducts();
       expect(products.isNotEmpty, true);
-      expect(products.any((p) => p.name == 'Egg'), true);
+      expect(products.any((p) => p.name == 'Egg' && p.category == 'Fresh & Grocery'), true);
+      expect(products.any((p) => p.name.contains('Water') && p.category == 'Beverages'), true);
 
       final debtors = await dbService.getDebtors();
       expect(debtors.isNotEmpty, true);
@@ -48,6 +49,7 @@ void main() {
         priceCentavos: 4500,
         initialStock: 30,
         reorderLevel: 5,
+        category: 'Snacks & Sweets',
       );
 
       expect(newProduct.id > 0, true);
@@ -57,6 +59,7 @@ void main() {
       expect(newProduct.pricePesos, 45.00);
       expect(newProduct.stock, 30);
       expect(newProduct.reorderLevel, 5);
+      expect(newProduct.category, 'Snacks & Sweets');
 
       final all = await dbService.getProducts();
       expect(all.any((p) => p.name == 'Chocnut 24s'), true);

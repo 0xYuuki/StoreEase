@@ -6,6 +6,7 @@ class Product {
   final int? stock;
   final int? reorderLevel;
   final int active;
+  final String category;
 
   Product({
     required this.id,
@@ -15,6 +16,7 @@ class Product {
     this.stock,
     this.reorderLevel,
     this.active = 1,
+    this.category = 'General',
   });
 
   double get pricePesos => priceCentavos / 100.0;
@@ -32,6 +34,7 @@ class Product {
       stock: json['stock'] as int?,
       reorderLevel: json['reorder_level'] as int?,
       active: (json['active'] as int?) ?? 1,
+      category: (json['category'] as String?) ?? 'General',
     );
   }
 
@@ -44,6 +47,7 @@ class Product {
       'stock': stock,
       'reorder_level': reorderLevel,
       'active': active,
+      'category': category,
     };
   }
 }

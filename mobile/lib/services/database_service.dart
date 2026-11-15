@@ -45,6 +45,12 @@ class DatabaseService {
         await _seedDefaultData(db);
       },
     );
+
+    // Auto-migrate schema: ensure category column exists on Products
+    final productCols = await _db!.rawQuery('PRAGMA table_info(Products)');
+    if (!productCols.any((c) => c['name'] == 'category')) {
+      await _db!.execute("ALTER TABLE Products ADD COLUMN category TEXT NOT NULL DEFAULT 'General'");
+    }
   }
 
   Future<void> _createTables(DatabaseExecutor db) async {
@@ -56,7 +62,8 @@ class DatabaseService {
         price INTEGER NOT NULL,
         active INTEGER NOT NULL DEFAULT 1,
         stock INTEGER,
-        reorder_level INTEGER
+        reorder_level INTEGER,
+        category TEXT NOT NULL DEFAULT 'General'
       )
     ''');
 
@@ -137,13 +144,13 @@ class DatabaseService {
 
     // Starter inventory products
     final products = [
-      {'barcode_string': '1', 'name': 'Egg', 'price': 1100, 'stock': 92, 'reorder_level': 10, 'active': 1},
-      {'barcode_string': '333333333331', 'name': 'Hotdog', 'price': 1200, 'stock': 50, 'reorder_level': 10, 'active': 1},
-      {'barcode_string': '4800016644801', 'name': 'Lucky Me! Pancit Canton (Original)', 'price': 1800, 'stock': 40, 'reorder_level': 15, 'active': 1},
-      {'barcode_string': '4800016644802', 'name': 'Mega Sardines in Tomato Sauce 155g', 'price': 2500, 'stock': 30, 'reorder_level': 10, 'active': 1},
-      {'barcode_string': '4800016644803', 'name': 'Nature Spring Bottled Water 500ml', 'price': 1500, 'stock': 60, 'reorder_level': 20, 'active': 1},
-      {'barcode_string': '4800016644804', 'name': 'San Miguel Pale Pilsen 330ml', 'price': 6500, 'stock': 24, 'reorder_level': 8, 'active': 1},
-      {'barcode_string': '4800016644805', 'name': 'Silver Swan Soy Sauce 385ml', 'price': 2200, 'stock': 20, 'reorder_level': 5, 'active': 1},
+      {'barcode_string': '1', 'name': 'Egg', 'price': 1100, 'stock': 92, 'reorder_level': 10, 'active': 1, 'category': 'Fresh & Grocery'},
+      {'barcode_string': '333333333331', 'name': 'Hotdog', 'price': 1200, 'stock': 50, 'reorder_level': 10, 'active': 1, 'category': 'Frozen & Meat'},
+      {'barcode_string': '4800016644801', 'name': 'Lucky Me! Pancit Canton (Original)', 'price': 1800, 'stock': 40, 'reorder_level': 15, 'active': 1, 'category': 'Instant Noodles & Snacks'},
+      {'barcode_string': '4800016644802', 'name': 'Mega Sardines in Tomato Sauce 155g', 'price': 2500, 'stock': 30, 'reorder_level': 10, 'active': 1, 'category': 'Canned Goods'},
+      {'barcode_string': '4800016644803', 'name': 'Nature Spring Bottled Water 500ml', 'price': 1500, 'stock': 60, 'reorder_level': 20, 'active': 1, 'category': 'Beverages'},
+      {'barcode_string': '4800016644804', 'name': 'San Miguel Pale Pilsen 330ml', 'price': 6500, 'stock': 24, 'reorder_level': 8, 'active': 1, 'category': 'Beverages'},
+      {'barcode_string': '4800016644805', 'name': 'Silver Swan Soy Sauce 385ml', 'price': 2200, 'stock': 20, 'reorder_level': 5, 'active': 1, 'category': 'Condiments & Cooking'},
     ];
 
     for (final p in products) {
@@ -192,9 +199,11 @@ class DatabaseService {
     required int priceCentavos,
     int? initialStock,
     int? reorderLevel,
+    String category = 'General',
   }) async {
     final cleanBarcode = barcodeString.trim();
     final cleanName = name.trim();
+    final cleanCategory = category.trim().isEmpty ? 'General' : category.trim();
     if (cleanBarcode.isEmpty) throw Exception('Barcode cannot be empty');
     if (cleanName.isEmpty) throw Exception('Product name cannot be empty');
     if (priceCentavos < 0) throw Exception('Price cannot be negative');
@@ -216,6 +225,7 @@ class DatabaseService {
         'stock': initialStock,
         'reorder_level': reorderLevel,
         'active': 1,
+        'category': cleanCategory,
       });
 
       if (initialStock != null && initialStock > 0) {
@@ -237,6 +247,7 @@ class DatabaseService {
         stock: initialStock,
         reorderLevel: reorderLevel,
         active: 1,
+        category: cleanCategory,
       );
     });
   }

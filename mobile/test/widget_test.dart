@@ -364,4 +364,59 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('InventoryScreen displays category sections and filters by category chips', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Navigate to Inventory tab
+    await tester.tap(find.text('Inventory'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify category section headers are displayed
+    expect(find.text('BEVERAGES'), findsOneWidget);
+    expect(find.text('CANNED GOODS'), findsOneWidget);
+    expect(find.text('All (7)'), findsOneWidget);
+
+    // Tap Beverages category filter chip
+    await tester.tap(find.text('Beverages (2)'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Only Beverages section is shown
+    expect(find.text('BEVERAGES'), findsOneWidget);
+    expect(find.text('CANNED GOODS'), findsNothing);
+    expect(find.text('Nature Spring Bottled Water 500ml'), findsOneWidget);
+    expect(find.text('Mega Sardines in Tomato Sauce 155g'), findsNothing);
+
+    // Tap All chip to restore all sections
+    await tester.tap(find.text('All (7)'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('BEVERAGES'), findsOneWidget);
+    expect(find.text('CANNED GOODS'), findsOneWidget);
+
+    await db.close();
+  });
 }

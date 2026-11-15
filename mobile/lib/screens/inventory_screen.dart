@@ -16,6 +16,18 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen> {
   final TextEditingController _searchController = TextEditingController();
+  String _selectedCategory = 'All';
+
+  static const List<String> _standardCategories = [
+    'Beverages',
+    'Canned Goods',
+    'Instant Noodles & Snacks',
+    'Condiments & Cooking',
+    'Fresh & Grocery',
+    'Frozen & Meat',
+    'Household & Personal Care',
+    'General',
+  ];
 
   @override
   void initState() {
@@ -37,6 +49,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final priceController = TextEditingController();
     final stockController = TextEditingController();
     final reorderController = TextEditingController();
+    final customCategoryController = TextEditingController();
+    String selectedCategory = 'General';
+    bool isCustomCategory = false;
 
     String generateRandomBarcode() {
       final random = Random();
@@ -92,6 +107,42 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         prefixIcon: Icon(Icons.label_outline),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        prefixIcon: Icon(Icons.category_outlined),
+                      ),
+                      items: [
+                        ..._standardCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))),
+                        const DropdownMenuItem(value: '__custom__', child: Text('+ Custom Category...')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            if (val == '__custom__') {
+                              isCustomCategory = true;
+                            } else {
+                              isCustomCategory = false;
+                              selectedCategory = val;
+                            }
+                          });
+                        }
+                      },
+                    ),
+                    if (isCustomCategory) ...[
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: customCategoryController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Custom Category Name',
+                          hintText: 'e.g. Bakery, Medicines...',
+                          prefixIcon: Icon(Icons.edit_note),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     TextField(
                       controller: priceController,
@@ -173,6 +224,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         ? int.tryParse(reorderController.text.trim())
                         : null;
 
+                    final categoryToSave = isCustomCategory
+                        ? customCategoryController.text.trim()
+                        : selectedCategory;
+                    final finalCategory = categoryToSave.isEmpty ? 'General' : categoryToSave;
+
                     final productProv = context.read<ProductProvider>();
                     final messenger = ScaffoldMessenger.of(context);
                     final nav = Navigator.of(ctx);
@@ -184,6 +240,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         priceCentavos: priceCentavos,
                         initialStock: initialStock,
                         reorderLevel: reorderLevel,
+                        category: finalCategory,
                       );
                       nav.pop(true);
                     } catch (e) {
@@ -325,13 +382,45 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final isLoading = productProv.isLoading;
 
     final query = _searchController.text.trim().toLowerCase();
-    final filtered = query.isEmpty
+    final matchingSearch = query.isEmpty
         ? allProducts
         : allProducts.where((p) {
             final name = p.name.trim().toLowerCase();
             final barcode = p.barcodeString.trim().toLowerCase();
             return name.startsWith(query) || barcode.startsWith(query);
           }).toList();
+
+    // Distinct categories present in inventory
+    final Set<String> categoriesSet = {};
+    for (final p in allProducts) {
+      final cat = p.category.trim();
+      if (cat.isNotEmpty) {
+        categoriesSet.add(cat);
+      }
+    }
+    final sortedCategories = categoriesSet.toList()..sort();
+
+    // Build category sections
+    final List<_CategorySection> displayedSections = [];
+    if (_selectedCategory == 'All') {
+      for (final cat in sortedCategories) {
+        final items = matchingSearch
+            .where((p) => p.category.trim().toLowerCase() == cat.toLowerCase())
+            .toList();
+        if (items.isNotEmpty) {
+          displayedSections.add(_CategorySection(category: cat, products: items));
+        }
+      }
+    } else {
+      final items = matchingSearch
+          .where((p) => p.category.trim().toLowerCase() == _selectedCategory.toLowerCase())
+          .toList();
+      if (items.isNotEmpty) {
+        displayedSections.add(_CategorySection(category: _selectedCategory, products: items));
+      }
+    }
+
+    final hasActiveFilter = query.isNotEmpty || _selectedCategory != 'All';
 
     return Scaffold(
       appBar: AppBar(
@@ -357,8 +446,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
       body: Column(
         children: [
+          // 1. Search Bar
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -378,103 +468,114 @@ class _InventoryScreenState extends State<InventoryScreen> {
               onChanged: (_) => setState(() {}),
             ),
           ),
+
+          // 2. Category Filter Chips
+          if (sortedCategories.isNotEmpty)
+            SizedBox(
+              height: 42,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: sortedCategories.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    final isSelected = _selectedCategory == 'All';
+                    return FilterChip(
+                      selected: isSelected,
+                      label: Text('All (${matchingSearch.length})'),
+                      selectedColor: AppTheme.primaryLight,
+                      checkmarkColor: AppTheme.primaryDark,
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? AppTheme.primaryDark : AppTheme.textDark,
+                      ),
+                      onSelected: (_) => setState(() => _selectedCategory = 'All'),
+                    );
+                  }
+
+                  final cat = sortedCategories[index - 1];
+                  final isSelected = _selectedCategory.toLowerCase() == cat.toLowerCase();
+                  final count = matchingSearch
+                      .where((p) => p.category.trim().toLowerCase() == cat.toLowerCase())
+                      .length;
+
+                  return FilterChip(
+                    selected: isSelected,
+                    avatar: Icon(
+                      _categoryIconData(cat),
+                      size: 16,
+                      color: isSelected ? AppTheme.primaryDark : AppTheme.textMuted,
+                    ),
+                    label: Text('$cat ($count)'),
+                    selectedColor: AppTheme.primaryLight,
+                    checkmarkColor: AppTheme.primaryDark,
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? AppTheme.primaryDark : AppTheme.textDark,
+                    ),
+                    onSelected: (_) => setState(() => _selectedCategory = cat),
+                  );
+                },
+              ),
+            ),
+
+          const SizedBox(height: 6),
+
+          // 3. Sectionized Product List
           Expanded(
             child: isLoading && allProducts.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : filtered.isEmpty
+                : displayedSections.isEmpty
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.inventory_2_outlined, size: 56, color: Colors.grey.shade400),
-                            const SizedBox(height: 10),
-                            const Text('No products found', style: TextStyle(color: AppTheme.textMuted)),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.inventory_2_outlined, size: 56, color: Colors.grey.shade400),
+                              const SizedBox(height: 12),
+                              Text(
+                                hasActiveFilter
+                                    ? 'No products found matching filters'
+                                    : 'No products in inventory yet',
+                                style: const TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                              ),
+                              if (hasActiveFilter) ...[
+                                const SizedBox(height: 12),
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _selectedCategory = 'All');
+                                  },
+                                  icon: const Icon(Icons.filter_alt_off, size: 16),
+                                  label: const Text('Reset Filters'),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final product = filtered[index];
-                          final hasStock = product.stock != null;
-                          final isLow = product.isLowStock;
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 80),
+                        itemCount: displayedSections.length,
+                        itemBuilder: (context, sectionIndex) {
+                          final section = displayedSections[sectionIndex];
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Section Header
+                              _buildSectionHeader(section.category, section.products.length),
 
-                          return Card(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () {
-                                AppDialogs.showStockHistoryDialog(context, product, api);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            product.name,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'Barcode: ${product.barcodeString}',
-                                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            product.formattedPrice,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                              color: AppTheme.primaryGreen,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: isLow
-                                                ? AppTheme.dangerLight
-                                                : (hasStock ? AppTheme.primaryLight : Colors.grey.shade100),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            hasStock ? '${product.stock} in stock' : 'Untracked',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: isLow
-                                                  ? AppTheme.dangerRed
-                                                  : (hasStock ? AppTheme.primaryDark : AppTheme.textMuted),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        TextButton.icon(
-                                          style: TextButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                            minimumSize: Size.zero,
-                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                          ),
-                                          icon: const Icon(Icons.tune, size: 14),
-                                          label: const Text('Adjust', style: TextStyle(fontSize: 12)),
-                                          onPressed: () => _showAdjustStockDialog(product),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                              // Products in this section
+                              ...section.products.map((product) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: _buildProductCard(context, product, api),
+                                  )),
+                              const SizedBox(height: 8),
+                            ],
                           );
                         },
                       ),
@@ -483,4 +584,176 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
     );
   }
+
+  Widget _buildSectionHeader(String category, int itemCount) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 8, left: 4, right: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(_categoryIconData(category), size: 16, color: AppTheme.primaryDark),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                category.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: AppTheme.textDark,
+                ),
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductCard(BuildContext context, Product product, ApiService api) {
+    final hasStock = product.stock != null;
+    final isLow = product.isLowStock;
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          AppDialogs.showStockHistoryDialog(context, product, api);
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Barcode: ${product.barcodeString}',
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      product.formattedPrice,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isLow
+                          ? AppTheme.dangerLight
+                          : (hasStock ? AppTheme.primaryLight : Colors.grey.shade100),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      hasStock ? '${product.stock} in stock' : 'Untracked',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isLow
+                            ? AppTheme.dangerRed
+                            : (hasStock ? AppTheme.primaryDark : AppTheme.textMuted),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: const Icon(Icons.tune, size: 14),
+                    label: const Text('Adjust', style: TextStyle(fontSize: 12)),
+                    onPressed: () => _showAdjustStockDialog(product),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _categoryIconData(String category) {
+    final cat = category.toLowerCase();
+    if (cat.contains('bever') ||
+        cat.contains('drink') ||
+        cat.contains('water') ||
+        cat.contains('beer') ||
+        cat.contains('juice')) {
+      return Icons.local_drink_outlined;
+    } else if (cat.contains('can')) {
+      return Icons.takeout_dining_outlined;
+    } else if (cat.contains('noodle') || cat.contains('snack') || cat.contains('chip')) {
+      return Icons.ramen_dining_outlined;
+    } else if (cat.contains('condiment') ||
+        cat.contains('sauce') ||
+        cat.contains('cook') ||
+        cat.contains('oil')) {
+      return Icons.soup_kitchen_outlined;
+    } else if (cat.contains('fresh') ||
+        cat.contains('grocer') ||
+        cat.contains('egg') ||
+        cat.contains('fruit') ||
+        cat.contains('veg')) {
+      return Icons.eco_outlined;
+    } else if (cat.contains('frozen') ||
+        cat.contains('meat') ||
+        cat.contains('fish') ||
+        cat.contains('hotdog')) {
+      return Icons.ac_unit_outlined;
+    } else if (cat.contains('house') ||
+        cat.contains('care') ||
+        cat.contains('soap') ||
+        cat.contains('clean')) {
+      return Icons.clean_hands_outlined;
+    }
+    return Icons.category_outlined;
+  }
+}
+
+class _CategorySection {
+  final String category;
+  final List<Product> products;
+  _CategorySection({required this.category, required this.products});
 }

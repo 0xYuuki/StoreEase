@@ -32,7 +32,15 @@ void main() {
       expect(product.priceCentavos, 1205);
       expect(product.pricePesos, 12.05);
       expect(product.formattedPrice, '₱12.05');
-      expect(product.isLowStock, true); // stock 5 <= reorder_level 10
+      expect(product.isLowStock, true);
+      expect(product.category, 'General');
+
+      final withCategory = Product.fromJson({
+        ...json,
+        'category': 'Fresh & Grocery',
+      });
+      expect(withCategory.category, 'Fresh & Grocery');
+      expect(withCategory.toJson()['category'], 'Fresh & Grocery'); // stock 5 <= reorder_level 10
     });
 
     test('CartItem and CartProvider line total & exact money sum', () {

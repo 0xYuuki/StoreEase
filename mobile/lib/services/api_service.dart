@@ -37,6 +37,7 @@ class ApiService {
     required int priceCentavos,
     int? initialStock,
     int? reorderLevel,
+    String category = 'General',
   }) async {
     return await database.createProduct(
       barcodeString: barcodeString,
@@ -44,6 +45,7 @@ class ApiService {
       priceCentavos: priceCentavos,
       initialStock: initialStock,
       reorderLevel: reorderLevel,
+      category: category,
     );
   }
 

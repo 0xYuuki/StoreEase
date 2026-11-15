@@ -53,6 +53,7 @@ class ProductProvider extends ChangeNotifier {
     required int priceCentavos,
     int? initialStock,
     int? reorderLevel,
+    String category = 'General',
   }) async {
     try {
       final newProduct = await api.createProduct(
@@ -61,6 +62,7 @@ class ProductProvider extends ChangeNotifier {
         priceCentavos: priceCentavos,
         initialStock: initialStock,
         reorderLevel: reorderLevel,
+        category: category,
       );
       await loadProducts();
       return newProduct;
