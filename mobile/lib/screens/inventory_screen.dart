@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
@@ -64,6 +65,184 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
+  Future<void> _showAddProductDialog() async {
+    final barcodeController = TextEditingController();
+    final nameController = TextEditingController();
+    final priceController = TextEditingController();
+    final stockController = TextEditingController();
+    final reorderController = TextEditingController();
+
+    String generateRandomBarcode() {
+      final random = Random();
+      String code = '';
+      for (int i = 0; i < 12; i++) {
+        code += random.nextInt(10).toString();
+      }
+      return code;
+    }
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Row(
+                children: const [
+                  Icon(Icons.add_shopping_cart, color: AppTheme.primaryGreen),
+                  SizedBox(width: 8),
+                  Text('Add New Product', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: barcodeController,
+                      decoration: InputDecoration(
+                        labelText: 'Barcode / Scan Code',
+                        hintText: 'Enter or generate barcode...',
+                        prefixIcon: const Icon(Icons.qr_code),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.casino_outlined),
+                          tooltip: 'Generate Random Barcode',
+                          onPressed: () {
+                            setDialogState(() {
+                              barcodeController.text = generateRandomBarcode();
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nameController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Product Name',
+                        hintText: 'e.g. Orange Juice, Potato Chips...',
+                        prefixIcon: Icon(Icons.label_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: priceController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Price (₱)',
+                        hintText: '0.00',
+                        prefixIcon: Icon(Icons.attach_money),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: stockController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Initial Stock',
+                              hintText: 'Optional',
+                              prefixIcon: Icon(Icons.inventory_2_outlined),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: reorderController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Reorder Alert',
+                              hintText: 'Optional',
+                              prefixIcon: Icon(Icons.warning_amber_outlined),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
+                  onPressed: () async {
+                    final barcode = barcodeController.text.trim();
+                    final name = nameController.text.trim();
+                    final priceText = priceController.text.trim();
+
+                    if (barcode.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please enter or generate a barcode'), backgroundColor: AppTheme.dangerRed),
+                      );
+                      return;
+                    }
+                    if (name.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please enter a product name'), backgroundColor: AppTheme.dangerRed),
+                      );
+                      return;
+                    }
+                    final pricePesos = double.tryParse(priceText);
+                    if (pricePesos == null || pricePesos < 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please enter a valid price'), backgroundColor: AppTheme.dangerRed),
+                      );
+                      return;
+                    }
+
+                    final priceCentavos = (pricePesos * 100).round();
+                    final initialStock = stockController.text.trim().isNotEmpty
+                        ? int.tryParse(stockController.text.trim())
+                        : null;
+                    final reorderLevel = reorderController.text.trim().isNotEmpty
+                        ? int.tryParse(reorderController.text.trim())
+                        : null;
+
+                    final api = context.read<ApiService>();
+                    final messenger = ScaffoldMessenger.of(context);
+                    final nav = Navigator.of(ctx);
+
+                    try {
+                      await api.createProduct(
+                        barcodeString: barcode,
+                        name: name,
+                        priceCentavos: priceCentavos,
+                        initialStock: initialStock,
+                        reorderLevel: reorderLevel,
+                      );
+                      nav.pop(true);
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text('Failed to add product: $e'), backgroundColor: AppTheme.dangerRed),
+                      );
+                    }
+                  },
+                  child: const Text('Save Product', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (saved == true && mounted) {
+      _loadProducts();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Product "${nameController.text.trim()}" added successfully!')),
+      );
+    }
+  }
+
   Future<void> _showAdjustStockDialog(Product product) async {
     final deltaController = TextEditingController();
     final reasonController = TextEditingController();
@@ -98,7 +277,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: ChoiceChip(
-                          label: const Text('Remove Stock (-)'),
+                          label: const Text('Deduct Stock (-)'),
                           selected: !isAddition,
                           selectedColor: AppTheme.dangerLight,
                           onSelected: (val) => setState(() => isAddition = false),
@@ -106,13 +285,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   TextField(
                     controller: deltaController,
                     keyboardType: TextInputType.number,
+                    autofocus: true,
                     decoration: InputDecoration(
-                      labelText: 'Quantity Units',
-                      prefixIcon: Icon(isAddition ? Icons.add : Icons.remove),
+                      labelText: 'Quantity to ${isAddition ? 'Add' : 'Deduct'}',
+                      prefixIcon: Icon(isAddition ? Icons.add_circle_outline : Icons.remove_circle_outline),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -120,7 +300,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     controller: reasonController,
                     decoration: const InputDecoration(
                       labelText: 'Reason for Adjustment',
-                      hintText: 'e.g. Delivery restock, damaged item',
+                      hintText: 'e.g. Delivery, Spoiled, Inventory Count...',
+                      prefixIcon: Icon(Icons.edit_note),
                     ),
                   ),
                 ],
@@ -131,21 +312,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isAddition ? AppTheme.primaryGreen : AppTheme.dangerRed,
+                  ),
                   onPressed: () async {
-                    final qty = int.tryParse(deltaController.text.trim());
-                    final reason = reasonController.text.trim();
-                    if (qty == null || qty <= 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please enter a valid positive quantity')),
-                      );
-                      return;
-                    }
-                    if (reason.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Reason is required')),
-                      );
-                      return;
-                    }
+                    final qty = int.tryParse(deltaController.text.trim()) ?? 0;
+                    if (qty <= 0) return;
+
+                    final reason = reasonController.text.trim().isNotEmpty
+                        ? reasonController.text.trim()
+                        : (isAddition ? 'Stock In' : 'Stock Out');
 
                     final delta = isAddition ? qty : -qty;
                     final messenger = ScaffoldMessenger.of(context);
@@ -186,11 +362,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
         title: const Text('Inventory Management'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Add Product',
+            onPressed: _showAddProductDialog,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
             onPressed: _loadProducts,
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddProductDialog,
+        backgroundColor: AppTheme.primaryGreen,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Add Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       body: Column(
         children: [
@@ -230,7 +417,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         ),
                       )
                     : ListView.separated(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
                         itemCount: _filtered.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
@@ -245,7 +432,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 AppDialogs.showStockHistoryDialog(context, product, api);
                               },
                               child: Padding(
-                                padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(12),
                                 child: Row(
                                   children: [
                                     Expanded(

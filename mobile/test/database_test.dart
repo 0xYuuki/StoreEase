@@ -37,6 +37,42 @@ void main() {
       expect(health['customer_count'] >= 2, true);
     });
 
+    test('Creates new product with optional initial stock and reorder level', () async {
+      final newProduct = await dbService.createProduct(
+        barcodeString: '480009999999',
+        name: 'Chocnut 24s',
+        priceCentavos: 4500,
+        initialStock: 30,
+        reorderLevel: 5,
+      );
+
+      expect(newProduct.id > 0, true);
+      expect(newProduct.name, 'Chocnut 24s');
+      expect(newProduct.barcodeString, '480009999999');
+      expect(newProduct.priceCentavos, 4500);
+      expect(newProduct.pricePesos, 45.00);
+      expect(newProduct.stock, 30);
+      expect(newProduct.reorderLevel, 5);
+
+      final all = await dbService.getProducts();
+      expect(all.any((p) => p.name == 'Chocnut 24s'), true);
+
+      final history = await dbService.getStockHistory(newProduct.id);
+      final entries = history['entries'] as List<StockMovement>;
+      expect(entries.isNotEmpty, true);
+      expect(entries.first.delta, 30);
+      expect(entries.first.reason, 'Initial Stock');
+
+      expect(
+        () => dbService.createProduct(
+          barcodeString: '480009999999',
+          name: 'Another item',
+          priceCentavos: 1000,
+        ),
+        throwsException,
+      );
+    });
+
     test('Barcode lookup returns matching active product', () async {
       final egg = await dbService.lookupBarcode('1');
       expect(egg, isNotNull);

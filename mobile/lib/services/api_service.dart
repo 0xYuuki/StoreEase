@@ -31,6 +31,22 @@ class ApiService {
   }
 
   // Products
+  Future<Product> createProduct({
+    required String barcodeString,
+    required String name,
+    required int priceCentavos,
+    int? initialStock,
+    int? reorderLevel,
+  }) async {
+    return await database.createProduct(
+      barcodeString: barcodeString,
+      name: name,
+      priceCentavos: priceCentavos,
+      initialStock: initialStock,
+      reorderLevel: reorderLevel,
+    );
+  }
+
   Future<List<Product>> getProducts() async {
     return await database.getProducts();
   }

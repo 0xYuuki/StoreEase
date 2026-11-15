@@ -186,6 +186,61 @@ class DatabaseService {
 
   // --- PRODUCTS ---
 
+  Future<Product> createProduct({
+    required String barcodeString,
+    required String name,
+    required int priceCentavos,
+    int? initialStock,
+    int? reorderLevel,
+  }) async {
+    final cleanBarcode = barcodeString.trim();
+    final cleanName = name.trim();
+    if (cleanBarcode.isEmpty) throw Exception('Barcode cannot be empty');
+    if (cleanName.isEmpty) throw Exception('Product name cannot be empty');
+    if (priceCentavos < 0) throw Exception('Price cannot be negative');
+
+    return await db.transaction<Product>((txn) async {
+      final existing = await txn.query(
+        'Products',
+        where: 'barcode_string = ? AND active = ?',
+        whereArgs: [cleanBarcode, 1],
+      );
+      if (existing.isNotEmpty) {
+        throw Exception('Barcode "$cleanBarcode" is already used by "${existing.first['name']}"');
+      }
+
+      final id = await txn.insert('Products', {
+        'barcode_string': cleanBarcode,
+        'name': cleanName,
+        'price': priceCentavos,
+        'stock': initialStock,
+        'reorder_level': reorderLevel,
+        'active': 1,
+      });
+
+      if (initialStock != null && initialStock > 0) {
+        final now = DateTime.now().toIso8601String();
+        await txn.insert('StockAdjustments', {
+          'product_id': id,
+          'delta': initialStock,
+          'resulting_stock': initialStock,
+          'reason': 'Initial Stock',
+          'timestamp': now,
+        });
+      }
+
+      return Product(
+        id: id,
+        barcodeString: cleanBarcode,
+        name: cleanName,
+        priceCentavos: priceCentavos,
+        stock: initialStock,
+        reorderLevel: reorderLevel,
+        active: 1,
+      );
+    });
+  }
+
   Future<List<Product>> getProducts() async {
     final rows = await db.query(
       'Products',

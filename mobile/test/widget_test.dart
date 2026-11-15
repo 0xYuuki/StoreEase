@@ -60,6 +60,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('Customer Debts'), findsOneWidget);
 
+    // Tap Inventory Tab
+    await tester.tap(find.text('Inventory'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Inventory Management'), findsOneWidget);
+    expect(find.text('Add Product'), findsOneWidget);
+
     // Tap Settings Tab
     await tester.tap(find.text('Settings'));
     await tester.pump();
