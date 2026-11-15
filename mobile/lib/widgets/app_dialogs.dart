@@ -105,6 +105,7 @@ class AppDialogs {
                     if (!isNewCustomer && debtors.isNotEmpty)
                       DropdownButtonFormField<int>(
                         initialValue: selectedDebtorId,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Select Customer',
                           prefixIcon: Icon(Icons.person_outline),
@@ -112,7 +113,11 @@ class AppDialogs {
                         items: debtors.map((d) {
                           return DropdownMenuItem<int>(
                             value: d.id,
-                            child: Text('${d.name} (${d.formattedBalance})'),
+                            child: Text(
+                              '${d.name} (${d.formattedBalance})',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
                           );
                         }).toList(),
                         onChanged: (val) => setState(() => selectedDebtorId = val),

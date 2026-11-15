@@ -282,6 +282,7 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
               'assets/logo.png',
@@ -289,7 +290,12 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
               errorBuilder: (_, _, _) => const Icon(Icons.store, color: AppTheme.primaryGreen),
             ),
             const SizedBox(width: 8),
-            const Text("Helen's Store"),
+            const Flexible(
+              child: Text(
+                "Helen's Store",
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         actions: [

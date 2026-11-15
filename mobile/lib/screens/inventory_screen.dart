@@ -163,19 +163,56 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       DropdownButtonFormField<String>(
                         key: ValueKey(selectedCategory),
                         initialValue: selectedCategory,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Category',
                           prefixIcon: Icon(Icons.category_outlined),
                         ),
+                        selectedItemBuilder: (BuildContext context) {
+                          return [
+                            ...availableCategories.map((c) => Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    c,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                )),
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                '+ Custom Category...',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ];
+                        },
                         items: [
-                          ...availableCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))),
+                          ...availableCategories.map(
+                            (c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(
+                                c,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ),
                           const DropdownMenuItem(
                             value: '__custom__',
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(Icons.add, size: 16, color: AppTheme.primaryGreen),
-                                SizedBox(width: 4),
-                                Text('+ Custom Category...'),
+                                SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    '+ Custom Category...',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -599,7 +636,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           // 2. Category Filter Chips
           if (sortedCategories.isNotEmpty)
             SizedBox(
-              height: 44,
+              height: 48,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -610,6 +647,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     final isSelected = _selectedCategory == 'All';
                     return FilterChip(
                       selected: isSelected,
+                      visualDensity: VisualDensity.compact,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       label: Text('All (${matchingSearch.length})'),
                       selectedColor: AppTheme.primaryLight,
@@ -631,6 +669,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
                   return FilterChip(
                     selected: isSelected,
+                    visualDensity: VisualDensity.compact,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     avatar: Icon(
                       _categoryIconData(cat),

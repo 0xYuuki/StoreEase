@@ -632,4 +632,63 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('Category field dropdown renders long categories without RenderFlex overflow on narrow screens', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Navigate to Inventory tab
+    await tester.tap(find.text('Inventory'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Tap Add Product FAB
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Open Category dropdown
+    await tester.tap(find.text('General'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Select the longest category name: Household & Personal Care
+    await tester.tap(find.text('Household & Personal Care').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify Household & Personal Care is selected without any overflow
+    expect(find.text('Household & Personal Care'), findsWidgets);
+
+    // Cancel dialog
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await db.close();
+  });
 }
