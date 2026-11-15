@@ -68,11 +68,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              scrollable: true,
               title: Row(
                 children: const [
                   Icon(Icons.add_shopping_cart, color: AppTheme.primaryGreen),
                   SizedBox(width: 8),
-                  Text('Add New Product', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Text('Add New Product', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ),
                 ],
               ),
               content: SingleChildScrollView(
@@ -150,7 +153,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Price (₱)',
                         hintText: '0.00',
-                        prefixIcon: Icon(Icons.attach_money),
+                        prefixText: '₱ ',
+                        prefixIcon: Icon(Icons.payments_outlined),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -472,7 +476,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           // 2. Category Filter Chips
           if (sortedCategories.isNotEmpty)
             SizedBox(
-              height: 42,
+              height: 44,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -483,6 +487,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     final isSelected = _selectedCategory == 'All';
                     return FilterChip(
                       selected: isSelected,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       label: Text('All (${matchingSearch.length})'),
                       selectedColor: AppTheme.primaryLight,
                       checkmarkColor: AppTheme.primaryDark,
@@ -503,6 +508,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
                   return FilterChip(
                     selected: isSelected,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     avatar: Icon(
                       _categoryIconData(cat),
                       size: 16,
@@ -591,28 +597,35 @@ class _InventoryScreenState extends State<InventoryScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryLight,
-                  borderRadius: BorderRadius.circular(8),
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(_categoryIconData(category), size: 16, color: AppTheme.primaryDark),
                 ),
-                child: Icon(_categoryIconData(category), size: 16, color: AppTheme.primaryDark),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                category.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
-                  color: AppTheme.textDark,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    category.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(

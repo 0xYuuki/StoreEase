@@ -400,7 +400,7 @@ class AppDialogs {
                         if (debtor.currentBalance > 0)
                           Expanded(
                             child: ElevatedButton.icon(
-                              icon: const Icon(Icons.attach_money, size: 18),
+                              icon: const Icon(Icons.payments_outlined, size: 18),
                               label: const Text('Record Payment'),
                               onPressed: () async {
                                 final paid = await showRecordPaymentDialog(context, debtor, api);
