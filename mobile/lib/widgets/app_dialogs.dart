@@ -756,6 +756,21 @@ class AppDialogs {
       builder: (ctx) => const _StockAlertsSheet(),
     );
   }
+
+  // 9. Bulk Quantity Input Dialog
+  static Future<int?> showQuantityInputDialog({
+    required BuildContext context,
+    required Product product,
+    required int currentQuantity,
+  }) async {
+    return await showDialog<int>(
+      context: context,
+      builder: (ctx) => _QuantityInputDialog(
+        product: product,
+        currentQuantity: currentQuantity,
+      ),
+    );
+  }
 }
 
 class _WeightEntrySheet extends StatefulWidget {
@@ -1403,6 +1418,278 @@ class _StockAlertsSheet extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _QuantityInputDialog extends StatefulWidget {
+  final Product product;
+  final int currentQuantity;
+
+  const _QuantityInputDialog({
+    required this.product,
+    required this.currentQuantity,
+  });
+
+  @override
+  State<_QuantityInputDialog> createState() => _QuantityInputDialogState();
+}
+
+class _QuantityInputDialogState extends State<_QuantityInputDialog> {
+  late TextEditingController _controller;
+  late int _quantity;
+
+  @override
+  void initState() {
+    super.initState();
+    _quantity = widget.currentQuantity;
+    _controller = TextEditingController(text: widget.currentQuantity.toString());
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _controller.text.length,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _setQty(int val) {
+    final clamped = val < 0 ? 0 : val;
+    setState(() {
+      _quantity = clamped;
+      _controller.text = clamped.toString();
+      _controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: _controller.text.length),
+      );
+    });
+  }
+
+  void _onTextChanged(String text) {
+    final parsed = int.tryParse(text);
+    setState(() {
+      _quantity = parsed ?? 0;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final unitPricePesos = widget.product.pricePesos;
+    final subtotalPesos = (_quantity * widget.product.priceCentavos) / 100.0;
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+      actionsPadding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryLight,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.format_list_numbered, color: AppTheme.primaryGreen, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Set Bulk Quantity', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  widget.product.name,
+                  style: const TextStyle(fontSize: 13, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Price: ₱${unitPricePesos.toStringAsFixed(2)} each',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+                ),
+                if (widget.product.stock != null)
+                  Text(
+                    'Stock: ${widget.product.formattedStock}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: widget.product.isLowStock ? AppTheme.dangerRed : AppTheme.textMuted,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Number input field with [-] and [+] steppers
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.remove_circle, size: 36, color: AppTheme.textMuted),
+                  onPressed: _quantity > 0 ? () => _setQty(_quantity - 1) : null,
+                  tooltip: 'Decrease by 1',
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    autofocus: true,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppTheme.primaryDark),
+                    keyboardType: const TextInputType.numberWithOptions(signed: false, decimal: false),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      hintText: '0',
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      suffixIcon: _controller.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 20),
+                              onPressed: () => _setQty(0),
+                            )
+                          : null,
+                    ),
+                    onChanged: _onTextChanged,
+                    onSubmitted: (_) {
+                      Navigator.of(context).pop(_quantity);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.add_circle, size: 36, color: AppTheme.primaryGreen),
+                  onPressed: () => _setQty(_quantity + 1),
+                  tooltip: 'Increase by 1',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Quick Preset Bulk Chips
+            const Text(
+              'Quick Presets:',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+            ),
+            const SizedBox(height: 4),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final preset in [6, 12, 24, 30, 50, 60, 100])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ActionChip(
+                        label: Text(
+                          preset == 12
+                              ? '12 (1 doz)'
+                              : (preset == 60 ? '60 (tray)' : '$preset'),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: _quantity == preset ? FontWeight.bold : FontWeight.w600,
+                            color: _quantity == preset ? Colors.white : AppTheme.primaryDark,
+                          ),
+                        ),
+                        backgroundColor: _quantity == preset ? AppTheme.primaryGreen : AppTheme.primaryLight,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        onPressed: () => _setQty(preset),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Live calculation & status card
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _quantity == 0 ? Colors.red.shade50 : AppTheme.primaryLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _quantity == 0 ? Colors.red.shade200 : AppTheme.accentGreen.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _quantity == 0 ? Icons.delete_outline : Icons.calculate_outlined,
+                    color: _quantity == 0 ? AppTheme.dangerRed : AppTheme.primaryDark,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_quantity == 0)
+                          const Text(
+                            'Item will be removed from cart',
+                            style: TextStyle(color: AppTheme.dangerRed, fontWeight: FontWeight.bold, fontSize: 13),
+                          )
+                        else ...[
+                          Text(
+                            '$_quantity pcs × ₱${unitPricePesos.toStringAsFixed(2)} = ₱${subtotalPesos.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppTheme.primaryDark,
+                            ),
+                          ),
+                          if (widget.product.stock != null && _quantity > widget.product.stock!)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                '⚠️ Exceeds stock (${widget.product.formattedStock} available)',
+                                style: TextStyle(color: Colors.amber.shade900, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        if (widget.currentQuantity > 0)
+          TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: AppTheme.dangerRed),
+            icon: const Icon(Icons.delete_outline, size: 16),
+            label: const Text('Remove'),
+            onPressed: () => Navigator.of(context).pop(0),
+          ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _quantity == 0 ? AppTheme.dangerRed : AppTheme.primaryGreen,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          ),
+          onPressed: () => Navigator.of(context).pop(_quantity),
+          child: Text(_quantity == 0 ? 'Remove Item' : 'Set Quantity'),
+        ),
+      ],
     );
   }
 }

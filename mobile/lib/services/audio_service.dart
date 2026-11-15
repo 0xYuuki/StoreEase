@@ -16,8 +16,9 @@ class AudioService {
 
     try {
       _player ??= AudioPlayer();
-      await _player?.stop();
-      await _player?.play(AssetSource('beep.wav'), mode: PlayerMode.lowLatency);
+      _player?.stop().then((_) {
+        _player?.play(AssetSource('beep.wav'), mode: PlayerMode.lowLatency);
+      }).catchError((_) {});
     } catch (_) {}
   }
 

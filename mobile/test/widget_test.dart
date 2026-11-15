@@ -886,4 +886,109 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('Cart bulk quantity input and non-blocking notification work seamlessly', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)),
+        ],
+        child: const MaterialApp(
+          home: HelensStoreApp(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 1. Search for an item: "Egg"
+    final searchField = find.byWidgetPredicate(
+      (w) => w is TextField && (w.decoration?.hintText?.contains('Search product') ?? false),
+    );
+    expect(searchField, findsOneWidget);
+
+    await tester.enterText(searchField, 'Egg');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Tap to add from preview list
+    expect(find.widgetWithText(ListTile, 'Egg'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ListTile, 'Egg'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Non-blocking top notice appears at top
+    expect(find.text('Added: Egg (+1 in cart)'), findsOneWidget);
+    // Crucially: no blocking SnackBar widget at the bottom!
+    expect(find.byType(SnackBar), findsNothing);
+
+    // Verify cart has item with quantity 1
+    expect(find.text('1'), findsWidgets);
+
+    // 2. Tap the middle quantity number badge in cart
+    final qtyBadge = find.ancestor(
+      of: find.text('1'),
+      matching: find.byType(InkWell),
+    ).first;
+    await tester.tap(qtyBadge);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 3. Verify Bulk Quantity Dialog appears
+    expect(find.text('Set Bulk Quantity'), findsOneWidget);
+    expect(find.text('Quick Presets:'), findsOneWidget);
+    expect(find.text('60 (tray)'), findsOneWidget);
+
+    // Enter 60 in the dialog's quantity text field
+    final dialogField = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(TextField),
+    );
+    expect(dialogField, findsOneWidget);
+    await tester.enterText(dialogField, '60');
+    await tester.pump();
+
+    // Verify live calculation displays 60 pcs
+    expect(find.textContaining('60 pcs ×'), findsOneWidget);
+
+    // 4. Tap "Set Quantity" button
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Set Quantity'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 5. Cart now shows 60 items
+    expect(find.text('60'), findsOneWidget);
+    expect(find.text('TOTAL (60 items)'), findsOneWidget);
+
+    // 6. Non-blocking top notice displays "Updated Egg quantity to 60"
+    expect(find.text('Updated Egg quantity to 60'), findsOneWidget);
+
+    // 7. Verify bottom dock buttons ("Exact", "Complete Sale") are completely accessible and unblocked
+    expect(find.text('Exact'), findsOneWidget);
+    expect(find.text('Complete Sale'), findsOneWidget);
+    await tester.tap(find.text('Exact'));
+    await tester.pump();
+
+    // Verify tendered field filled with exact total
+    final tenderedField = find.byWidgetPredicate(
+      (w) => w is TextField && (w.decoration?.labelText?.contains('Cash Tendered') ?? false),
+    );
+    final tf = tester.widget<TextField>(tenderedField);
+    expect(tf.controller?.text, isNotEmpty);
+
+    await db.close();
+  });
 }

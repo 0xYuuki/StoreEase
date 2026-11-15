@@ -56,6 +56,18 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
+  void updateQuantity(int productId, int newQuantity) {
+    final index = _items.indexWhere((i) => i.product.id == productId);
+    if (index >= 0) {
+      if (newQuantity <= 0) {
+        _items.removeAt(index);
+      } else {
+        _items[index].quantity = newQuantity;
+      }
+      notifyListeners();
+    }
+  }
+
   void incrementQuantity(int productId) {
     final index = _items.indexWhere((i) => i.product.id == productId);
     if (index >= 0) {

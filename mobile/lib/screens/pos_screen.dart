@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -30,6 +31,35 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
   bool _isScanCooldown = false;
   String? _lastScannedProductName;
   static const Duration _scanCooldown = Duration(milliseconds: 1500); // 1.5 second interval to ensure 1 count per scan
+
+  // Non-blocking top notification
+  String? _topNoticeMessage;
+  IconData _topNoticeIcon = Icons.check_circle;
+  Color _topNoticeColor = AppTheme.primaryDark;
+  Timer? _topNoticeTimer;
+
+  void _showTopNotice(
+    String message, {
+    IconData icon = Icons.check_circle,
+    Color color = AppTheme.primaryDark,
+    Duration duration = const Duration(milliseconds: 1800),
+  }) {
+    _topNoticeTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _topNoticeMessage = message;
+      _topNoticeIcon = icon;
+      _topNoticeColor = color;
+    });
+
+    _topNoticeTimer = Timer(duration, () {
+      if (mounted) {
+        setState(() {
+          _topNoticeMessage = null;
+        });
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -68,6 +98,7 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _topNoticeTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     _tenderedController.dispose();
@@ -103,42 +134,14 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
         await AudioService.playScanBeep();
         if (mounted) {
           final wStr = selectedWeight % 1 == 0 ? selectedWeight.toInt().toString() : selectedWeight.toStringAsFixed(2);
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text('Added $wStr ${product.unit} of ${product.name} to cart'),
-                  ),
-                ],
-              ),
-              backgroundColor: AppTheme.primaryDark,
-              duration: const Duration(seconds: 1),
-            ),
-          );
+          _showTopNotice('Added $wStr ${product.unit} of ${product.name} to cart');
         }
       }
     } else {
       cart.addProduct(product);
       await AudioService.playScanBeep();
       if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Added: ${product.name} (+1 in cart)')),
-              ],
-            ),
-            backgroundColor: AppTheme.primaryDark,
-            duration: const Duration(seconds: 1),
-          ),
-        );
+        _showTopNotice('Added: ${product.name} (+1 in cart)');
       }
     }
   }
@@ -168,13 +171,11 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
       await _addProductToCart(product);
     } else {
       HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No product found for barcode: $clean'),
-          backgroundColor: AppTheme.dangerRed,
-          duration: const Duration(seconds: 2),
-        ),
+      _showTopNotice(
+        'No product found for barcode: $clean',
+        icon: Icons.error_outline,
+        color: AppTheme.dangerRed,
+        duration: const Duration(seconds: 2),
       );
     }
   }
@@ -185,8 +186,10 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
     final productProv = context.read<ProductProvider>();
 
     if (cart.items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cart is empty. Add items first.')),
+      _showTopNotice(
+        'Cart is empty. Add items first.',
+        icon: Icons.info_outline,
+        color: AppTheme.dangerRed,
       );
       return;
     }
@@ -278,6 +281,8 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
     if (lowItems.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(12),
           backgroundColor: AppTheme.dangerRed,
           duration: const Duration(seconds: 4),
           content: Row(
@@ -365,9 +370,11 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
             ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Camera Barcode Scanner View (collapsible)
+          Column(
+            children: [
+              // Camera Barcode Scanner View (collapsible)
           if (_showScanner && widget.isActive)
             Container(
               height: 170,
@@ -619,9 +626,49 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
                                       ),
                                     )
                                   else
-                                    Text(
-                                      '${item.quantity}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    InkWell(
+                                      onTap: () async {
+                                        final newQty = await AppDialogs.showQuantityInputDialog(
+                                          context: context,
+                                          product: item.product,
+                                          currentQuantity: item.quantity,
+                                        );
+                                        if (newQty != null) {
+                                          if (newQty <= 0) {
+                                            cart.removeItem(item.product.id);
+                                            _showTopNotice(
+                                              'Removed ${item.product.name} from cart',
+                                              icon: Icons.delete_outline,
+                                              color: AppTheme.dangerRed,
+                                            );
+                                          } else {
+                                            cart.updateQuantity(item.product.id, newQty);
+                                            _showTopNotice(
+                                              'Updated ${item.product.name} quantity to $newQty',
+                                            );
+                                          }
+                                        }
+                                      },
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primaryLight,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: AppTheme.accentGreen),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              '${item.quantity}',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryDark),
+                                            ),
+                                            const SizedBox(width: 2),
+                                            const Icon(Icons.edit, size: 12, color: AppTheme.primaryDark),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   IconButton(
                                     icon: const Icon(Icons.add_circle_outline, size: 22),
@@ -736,6 +783,47 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-    );
+
+      // Non-blocking Floating Top Notice Pill
+      if (_topNoticeMessage != null)
+        Positioned(
+          top: (_showScanner && widget.isActive) ? 180 : 10,
+          left: 16,
+          right: 16,
+          child: IgnorePointer(
+            ignoring: true, // Non-blocking: touches pass completely through!
+            child: Center(
+              child: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(24),
+                color: _topNoticeColor.withValues(alpha: 0.95),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_topNoticeIcon, color: Colors.greenAccent, size: 18),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          _topNoticeMessage!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+    ],
+  ),
+);
   }
 }

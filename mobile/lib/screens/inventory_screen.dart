@@ -425,7 +425,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     if (saved == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Product "${nameController.text.trim()}" added successfully!')),
+        SnackBar(
+          content: Text('Product "${nameController.text.trim()}" added successfully!'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 1500),
+        ),
       );
     }
   }
@@ -534,7 +538,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     if (result == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Stock for "${product.name}" updated')),
+        SnackBar(
+          content: Text('Stock for "${product.name}" updated'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 1500),
+        ),
       );
     }
   }
@@ -971,7 +979,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
       try {
         await context.read<ProductProvider>().deleteProduct(product.id);
         messenger.showSnackBar(
-          SnackBar(content: Text('Product "${product.name}" deleted successfully.')),
+          SnackBar(
+            content: Text('Product "${product.name}" deleted successfully.'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(milliseconds: 1500),
+          ),
         );
       } catch (e) {
         messenger.showSnackBar(

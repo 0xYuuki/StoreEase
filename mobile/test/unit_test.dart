@@ -329,5 +329,42 @@ void main() {
 
       await db.close();
     });
+
+    test('CartProvider updateQuantity supports bulk ordering and item removal', () async {
+      final db = DatabaseService();
+      await db.init(customPath: inMemoryDatabasePath);
+      final storage = StorageService();
+      final api = ApiService(database: db, storage: storage);
+      final cart = CartProvider(api: api);
+
+      final egg = Product(
+        id: 10,
+        barcodeString: 'PLU-EGG',
+        name: 'Egg (Medium)',
+        priceCentavos: 800, // ₱8.00
+        category: 'Dairy & Eggs',
+      );
+
+      // Add 1 egg
+      cart.addProduct(egg);
+      expect(cart.itemCount, 1);
+      expect(cart.totalPesos, 8.0);
+
+      // Update to bulk quantity 60 eggs
+      cart.updateQuantity(10, 60);
+      expect(cart.itemCount, 60);
+      expect(cart.items.first.quantity, 60);
+      expect(cart.items.first.lineTotalPesos, 480.0);
+      expect(cart.totalPesos, 480.0);
+      expect(cart.formattedTotal, '₱480.00');
+
+      // Update to 0 removes the item
+      cart.updateQuantity(10, 0);
+      expect(cart.items.isEmpty, true);
+      expect(cart.itemCount, 0);
+      expect(cart.totalPesos, 0.0);
+
+      await db.close();
+    });
   });
 }
