@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
+import '../providers/analytics_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/debt_provider.dart';
 import '../providers/product_provider.dart';
@@ -185,9 +186,11 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
           debtProv.loadDebts();
           productProv.loadProducts();
           context.read<SalesProvider>().loadSales();
+          context.read<AnalyticsProvider>().loadAnalytics();
           await AppDialogs.showReceiptDialog(context, receipt);
           if (mounted) {
             context.read<SalesProvider>().loadSales();
+            context.read<AnalyticsProvider>().loadAnalytics();
           }
         }
       } catch (e) {
@@ -210,9 +213,11 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
           _tenderedController.clear();
           productProv.loadProducts();
           context.read<SalesProvider>().loadSales();
+          context.read<AnalyticsProvider>().loadAnalytics();
           await AppDialogs.showReceiptDialog(context, receipt);
           if (mounted) {
             context.read<SalesProvider>().loadSales();
+            context.read<AnalyticsProvider>().loadAnalytics();
           }
         }
       } catch (e) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/analytics_provider.dart';
 import '../providers/debt_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/sales_provider.dart';
@@ -109,6 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context.read<DebtProvider>().loadDebts();
           context.read<ProductProvider>().loadProducts();
           context.read<SalesProvider>().loadSales();
+          context.read<AnalyticsProvider>().loadAnalytics();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Database reset and seeded successfully!')),
           );

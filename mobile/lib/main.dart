@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'providers/analytics_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/debt_provider.dart';
 import 'providers/product_provider.dart';
 import 'providers/sales_provider.dart';
+import 'screens/analytics_screen.dart';
 import 'screens/debts_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/pos_screen.dart';
@@ -31,6 +33,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
         ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
         ChangeNotifierProvider(create: (_) => SalesProvider(api: api)..loadSales()),
+        ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)..loadAnalytics()),
       ],
       child: const HelensStoreApp(),
     ),
@@ -71,10 +74,12 @@ class _HomeShellState extends State<HomeShell> {
           const DebtsScreen(),
           const InventoryScreen(),
           const SalesScreen(),
+          const AnalyticsScreen(),
           const SettingsScreen(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
         onTap: (index) {
           setState(() => _currentIndex = index);
@@ -84,6 +89,8 @@ class _HomeShellState extends State<HomeShell> {
             context.read<DebtProvider>().loadDebts();
           } else if (index == 3) {
             context.read<SalesProvider>().loadSales();
+          } else if (index == 4) {
+            context.read<AnalyticsProvider>().loadAnalytics();
           }
         },
         items: const [
@@ -102,6 +109,11 @@ class _HomeShellState extends State<HomeShell> {
           BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long_outlined),
             label: 'Sales',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.analytics_outlined),
+            activeIcon: Icon(Icons.analytics),
+            label: 'Analytics',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),

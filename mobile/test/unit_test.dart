@@ -130,5 +130,42 @@ void main() {
       expect(tx.resultingBalancePesos, 25.0);
       expect(tx.formattedResultingBalance, '₱25.00');
     });
+
+    test('AnalyticsData and AnalyticsKpis deserialization & currency formatting', () {
+      final json = {
+        'kpis': {
+          'today': 45000,
+          'week': 125000,
+          'month': 350000,
+          'year': 1200000,
+        },
+        'popularItems': [
+          {'name': 'Egg', 'times_sold': 50, 'revenue': 55000},
+          {'name': 'Lucky Me! Pancit Canton', 'times_sold': 25, 'revenue': 45000},
+        ],
+        'chartData': {
+          'labels': ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15'],
+          'data': [10000, 15000, 20000, 12000, 25000, 30000, 45000],
+        },
+      };
+
+      final analytics = AnalyticsData.fromJson(json);
+      expect(analytics.kpis.today, 45000);
+      expect(analytics.kpis.todayPesos, 450.0);
+      expect(analytics.kpis.formattedToday, '₱450.00');
+      expect(analytics.kpis.formattedWeek, '₱1250.00');
+      expect(analytics.kpis.formattedMonth, '₱3500.00');
+      expect(analytics.kpis.formattedYear, '₱12000.00');
+
+      expect(analytics.popularItems.length, 2);
+      expect(analytics.popularItems.first.name, 'Egg');
+      expect(analytics.popularItems.first.timesSold, 50);
+      expect(analytics.popularItems.first.revenuePesos, 550.0);
+      expect(analytics.popularItems.first.formattedRevenue, '₱550.00');
+
+      expect(analytics.chartData.labels.length, 7);
+      expect(analytics.chartData.data.length, 7);
+      expect(analytics.chartData.data.last, 45000);
+    });
   });
 }

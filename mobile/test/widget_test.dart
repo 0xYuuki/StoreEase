@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:helen_store_mobile/main.dart';
+import 'package:helen_store_mobile/providers/analytics_provider.dart';
 import 'package:helen_store_mobile/providers/cart_provider.dart';
 import 'package:helen_store_mobile/providers/debt_provider.dart';
 import 'package:helen_store_mobile/providers/product_provider.dart';
@@ -39,6 +40,7 @@ void main() {
           ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
           ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
           ChangeNotifierProvider(create: (_) => SalesProvider(api: api)..loadSales()),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)..loadAnalytics()),
         ],
         child: const HelensStoreApp(),
       ),
@@ -47,11 +49,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    // Verify all 5 navigation tabs exist
+    // Verify all 6 navigation tabs exist
     expect(find.text('POS'), findsOneWidget);
     expect(find.text('Debts'), findsOneWidget);
     expect(find.text('Inventory'), findsOneWidget);
     expect(find.text('Sales'), findsOneWidget);
+    expect(find.text('Analytics'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
 
     // Initial view is POS
@@ -76,6 +79,15 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('Sales History'), findsOneWidget);
+
+    // Tap Analytics Tab
+    await tester.tap(find.text('Analytics'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sales Analytics'), findsOneWidget);
+    expect(find.text('Overview & Revenue'), findsOneWidget);
+    expect(find.text("Today's Sales"), findsOneWidget);
+    expect(find.text('Sales Trend (Last 7 Days)'), findsOneWidget);
 
     // Tap Settings Tab
     await tester.tap(find.text('Settings'));
@@ -105,6 +117,7 @@ void main() {
           ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
           ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
           ChangeNotifierProvider(create: (_) => SalesProvider(api: api)..loadSales()),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)..loadAnalytics()),
         ],
         child: const HelensStoreApp(),
       ),

@@ -121,4 +121,9 @@ class ApiService {
   Future<SaleReceipt> getReceipt(int saleId) async {
     return await database.getReceipt(saleId);
   }
+
+  // Analytics Dashboard
+  Future<AnalyticsData> getAnalytics() async {
+    return await database.getAnalytics();
+  }
 }

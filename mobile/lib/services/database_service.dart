@@ -802,6 +802,101 @@ class DatabaseService {
     };
   }
 
+  // --- ANALYTICS DASHBOARD ---
+
+  Future<AnalyticsData> getAnalytics() async {
+    final now = DateTime.now();
+
+    // Local day calculations
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final tomorrowStart = todayStart.add(const Duration(days: 1));
+
+    // Week start: Sunday (weekday in Dart is 1 = Monday ... 7 = Sunday; Sunday % 7 = 0)
+    final daysSinceSunday = todayStart.weekday % 7;
+    final weekStart = todayStart.subtract(Duration(days: daysSinceSunday));
+
+    // Month start: 1st day of month
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    // Year start: Jan 1
+    final yearStart = DateTime(now.year, 1, 1);
+
+    // 1. Calculate KPI Totals
+    final todayTotal = await _sumSalesBetween(todayStart.toIso8601String(), tomorrowStart.toIso8601String());
+    final weekTotal = await _sumSalesBetween(weekStart.toIso8601String(), tomorrowStart.toIso8601String());
+    final monthTotal = await _sumSalesBetween(monthStart.toIso8601String(), tomorrowStart.toIso8601String());
+    final yearTotal = await _sumSalesBetween(yearStart.toIso8601String(), tomorrowStart.toIso8601String());
+
+    final kpis = AnalyticsKpis(
+      today: todayTotal,
+      week: weekTotal,
+      month: monthTotal,
+      year: yearTotal,
+    );
+
+    // 2. Popular Items (Top 5 by quantity sold)
+    final popularRows = await db.rawQuery('''
+      SELECT 
+        product_name AS name,
+        SUM(quantity) AS times_sold,
+        SUM(line_total) AS revenue
+      FROM SaleItems
+      GROUP BY product_id, product_name
+      ORDER BY times_sold DESC, name ASC
+      LIMIT 5
+    ''');
+
+    final popularItems = popularRows.map((r) => PopularItem(
+      name: r['name'] as String? ?? 'Unknown Item',
+      timesSold: (r['times_sold'] as num?)?.toInt() ?? 0,
+      revenue: (r['revenue'] as num?)?.toInt() ?? 0,
+    )).toList();
+
+    // 3. 7-Day Trend Chart
+    final dates = List.generate(7, (i) {
+      final d = todayStart.subtract(Duration(days: 6 - i));
+      return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    });
+
+    final sevenDaysStart = '${dates.first}T00:00:00';
+    final chartRows = await db.rawQuery('''
+      SELECT 
+        substr(timestamp, 1, 10) AS sale_date,
+        SUM(total_amount) AS total
+      FROM Sales
+      WHERE timestamp >= ? AND timestamp < ?
+      GROUP BY sale_date
+    ''', [sevenDaysStart, tomorrowStart.toIso8601String()]);
+
+    final Map<String, int> dailyTotals = {};
+    for (final r in chartRows) {
+      final date = r['sale_date'] as String?;
+      if (date != null) {
+        dailyTotals[date] = (r['total'] as num?)?.toInt() ?? 0;
+      }
+    }
+
+    final chartData = ChartData(
+      labels: dates,
+      data: dates.map((d) => dailyTotals[d] ?? 0).toList(),
+    );
+
+    return AnalyticsData(
+      kpis: kpis,
+      popularItems: popularItems,
+      chartData: chartData,
+    );
+  }
+
+  Future<int> _sumSalesBetween(String start, String end) async {
+    final rows = await db.rawQuery(
+      'SELECT COALESCE(SUM(total_amount), 0) AS total FROM Sales WHERE timestamp >= ? AND timestamp < ?',
+      [start, end],
+    );
+    if (rows.isEmpty) return 0;
+    return (rows.first['total'] as num?)?.toInt() ?? 0;
+  }
+
   Future<void> resetToSampleData() async {
     await db.transaction((txn) async {
       await txn.delete('CustomerDebts');

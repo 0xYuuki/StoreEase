@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:helen_store_mobile/models/models.dart';
+import 'package:helen_store_mobile/providers/analytics_provider.dart';
 import 'package:helen_store_mobile/providers/product_provider.dart';
 import 'package:helen_store_mobile/providers/sales_provider.dart';
 import 'package:helen_store_mobile/services/api_service.dart';
@@ -306,6 +307,44 @@ void main() {
       expect(fetchedReceipt.saleId, receipt.saleId);
       expect(fetchedReceipt.items.first.productName, 'Egg');
       expect(fetchedReceipt.items.first.quantity, 2);
+    });
+
+    test('Computes analytics KPIs, top 5 popular products, and 7-day sales trend', () async {
+      final egg = (await dbService.lookupBarcode('1'))!;
+      final hotdog = (await dbService.lookupBarcode('333333333331'))!;
+
+      // Checkout a sale
+      await dbService.checkout(
+        items: [
+          CartItem(product: egg, quantity: 4), // 4 * 1100 = 4400
+          CartItem(product: hotdog, quantity: 2), // 2 * 1200 = 2400
+        ],
+        tenderedAmount: 10000,
+      );
+
+      final api = ApiService(database: dbService);
+      final analyticsProv = AnalyticsProvider(api: api);
+      await analyticsProv.loadAnalytics();
+
+      final data = analyticsProv.data;
+      expect(data, isNotNull);
+
+      // Verify KPIs
+      expect(data!.kpis.today >= 6800, true);
+      expect(data.kpis.week >= 6800, true);
+      expect(data.kpis.month >= 6800, true);
+      expect(data.kpis.year >= 6800, true);
+
+      // Verify Popular Products
+      expect(data.popularItems.isNotEmpty, true);
+      final popularEgg = data.popularItems.firstWhere((p) => p.name == 'Egg');
+      expect(popularEgg.timesSold, 4);
+      expect(popularEgg.revenue, 4400);
+
+      // Verify 7-day trend
+      expect(data.chartData.labels.length, 7);
+      expect(data.chartData.data.length, 7);
+      expect(data.chartData.data.last >= 6800, true);
     });
 
     test('Reset to sample data clears and restores initial dataset', () async {

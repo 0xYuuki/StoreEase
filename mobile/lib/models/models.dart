@@ -271,3 +271,124 @@ class SalesSummary {
     );
   }
 }
+
+class AnalyticsKpis {
+  final int today; // centavos
+  final int week; // centavos
+  final int month; // centavos
+  final int year; // centavos
+
+  AnalyticsKpis({
+    required this.today,
+    required this.week,
+    required this.month,
+    required this.year,
+  });
+
+  double get todayPesos => today / 100.0;
+  double get weekPesos => week / 100.0;
+  double get monthPesos => month / 100.0;
+  double get yearPesos => year / 100.0;
+
+  String get formattedToday => '₱${todayPesos.toStringAsFixed(2)}';
+  String get formattedWeek => '₱${weekPesos.toStringAsFixed(2)}';
+  String get formattedMonth => '₱${monthPesos.toStringAsFixed(2)}';
+  String get formattedYear => '₱${yearPesos.toStringAsFixed(2)}';
+
+  factory AnalyticsKpis.fromJson(Map<String, dynamic> json) {
+    return AnalyticsKpis(
+      today: (json['today'] as num?)?.toInt() ?? 0,
+      week: (json['week'] as num?)?.toInt() ?? 0,
+      month: (json['month'] as num?)?.toInt() ?? 0,
+      year: (json['year'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'today': today,
+    'week': week,
+    'month': month,
+    'year': year,
+  };
+}
+
+class PopularItem {
+  final String name;
+  final int timesSold;
+  final int revenue; // centavos
+
+  PopularItem({
+    required this.name,
+    required this.timesSold,
+    required this.revenue,
+  });
+
+  double get revenuePesos => revenue / 100.0;
+  String get formattedRevenue => '₱${revenuePesos.toStringAsFixed(2)}';
+
+  factory PopularItem.fromJson(Map<String, dynamic> json) {
+    return PopularItem(
+      name: json['name'] as String? ?? 'Unknown Item',
+      timesSold: (json['times_sold'] ?? json['timesSold'] as num?)?.toInt() ?? 0,
+      revenue: (json['revenue'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'times_sold': timesSold,
+    'revenue': revenue,
+  };
+}
+
+class ChartData {
+  final List<String> labels; // e.g. ['2026-11-09', ..., '2026-11-15']
+  final List<int> data; // centavos
+
+  ChartData({
+    required this.labels,
+    required this.data,
+  });
+
+  factory ChartData.fromJson(Map<String, dynamic> json) {
+    final rawLabels = json['labels'] as List<dynamic>? ?? [];
+    final rawData = json['data'] as List<dynamic>? ?? [];
+    return ChartData(
+      labels: rawLabels.map((e) => e.toString()).toList(),
+      data: rawData.map((e) => (e as num).toInt()).toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'labels': labels,
+    'data': data,
+  };
+}
+
+class AnalyticsData {
+  final AnalyticsKpis kpis;
+  final List<PopularItem> popularItems;
+  final ChartData chartData;
+
+  AnalyticsData({
+    required this.kpis,
+    required this.popularItems,
+    required this.chartData,
+  });
+
+  factory AnalyticsData.fromJson(Map<String, dynamic> json) {
+    return AnalyticsData(
+      kpis: AnalyticsKpis.fromJson((json['kpis'] as Map<String, dynamic>?) ?? {}),
+      popularItems: ((json['popularItems'] ?? json['popular_items']) as List<dynamic>? ?? [])
+          .map((e) => PopularItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      chartData: ChartData.fromJson((json['chartData'] ?? json['chart_data']) as Map<String, dynamic>? ?? {}),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'kpis': kpis.toJson(),
+    'popularItems': popularItems.map((e) => e.toJson()).toList(),
+    'chartData': chartData.toJson(),
+  };
+}
