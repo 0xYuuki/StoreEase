@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../providers/cart_provider.dart';
 import '../providers/debt_provider.dart';
 import '../providers/product_provider.dart';
+import '../providers/sales_provider.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_dialogs.dart';
@@ -149,7 +150,11 @@ class _PosScreenState extends State<PosScreen> {
           _tenderedController.clear();
           debtProv.loadDebts();
           productProv.loadProducts();
+          context.read<SalesProvider>().loadSales();
           await AppDialogs.showReceiptDialog(context, receipt);
+          if (mounted) {
+            context.read<SalesProvider>().loadSales();
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -167,7 +172,11 @@ class _PosScreenState extends State<PosScreen> {
         if (receipt != null && mounted) {
           _tenderedController.clear();
           productProv.loadProducts();
+          context.read<SalesProvider>().loadSales();
           await AppDialogs.showReceiptDialog(context, receipt);
+          if (mounted) {
+            context.read<SalesProvider>().loadSales();
+          }
         }
       } catch (e) {
         if (mounted) {

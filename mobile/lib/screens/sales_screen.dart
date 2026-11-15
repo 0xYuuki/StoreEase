@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/models.dart';
-import '../services/api_service.dart';
+import '../providers/sales_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_dialogs.dart';
 
@@ -13,46 +12,18 @@ class SalesScreen extends StatefulWidget {
 }
 
 class _SalesScreenState extends State<SalesScreen> {
-  List<SalesSummary> _sales = [];
-  bool _isLoading = false;
-  int _page = 1;
-  bool _hasMore = false;
-
   @override
   void initState() {
     super.initState();
-    _loadSales();
-  }
-
-  Future<void> _loadSales({int page = 1}) async {
-    setState(() => _isLoading = true);
-    try {
-      final api = context.read<ApiService>();
-      final data = await api.getSales(page: page);
-      setState(() {
-        if (page == 1) {
-          _sales = data['sales'] as List<SalesSummary>;
-        } else {
-          _sales.addAll(data['sales'] as List<SalesSummary>);
-        }
-        _hasMore = data['has_more'] as bool;
-        _page = page;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load sales: $e'), backgroundColor: AppTheme.dangerRed),
-        );
-      }
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SalesProvider>().loadSales();
+    });
   }
 
   Future<void> _viewReceipt(int saleId) async {
     try {
-      final api = context.read<ApiService>();
-      final receipt = await api.getReceipt(saleId);
+      final salesProv = context.read<SalesProvider>();
+      final receipt = await salesProv.getReceipt(saleId);
       if (mounted) {
         AppDialogs.showReceiptDialog(context, receipt);
       }
@@ -67,6 +38,12 @@ class _SalesScreenState extends State<SalesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final salesProv = context.watch<SalesProvider>();
+    final sales = salesProv.sales;
+    final isLoading = salesProv.isLoading;
+    final hasMore = salesProv.hasMore;
+    final page = salesProv.page;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sales History'),
@@ -74,13 +51,13 @@ class _SalesScreenState extends State<SalesScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
-            onPressed: () => _loadSales(page: 1),
+            onPressed: () => context.read<SalesProvider>().loadSales(page: 1),
           ),
         ],
       ),
-      body: _isLoading && _sales.isEmpty
+      body: isLoading && sales.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : _sales.isEmpty
+          : sales.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -93,19 +70,19 @@ class _SalesScreenState extends State<SalesScreen> {
                 )
               : ListView.separated(
                   padding: const EdgeInsets.all(12),
-                  itemCount: _sales.length + (_hasMore ? 1 : 0),
+                  itemCount: sales.length + (hasMore ? 1 : 0),
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
-                    if (index == _sales.length) {
+                    if (index == sales.length) {
                       return Center(
                         child: TextButton(
-                          onPressed: () => _loadSales(page: _page + 1),
+                          onPressed: () => context.read<SalesProvider>().loadSales(page: page + 1),
                           child: const Text('Load More Sales'),
                         ),
                       );
                     }
 
-                    final sale = _sales[index];
+                    final sale = sales[index];
                     return Card(
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
@@ -136,7 +113,7 @@ class _SalesScreenState extends State<SalesScreen> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      sale.timestamp,
+                                      sale.timestamp.split('T').first,
                                       style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                                     ),
                                   ],

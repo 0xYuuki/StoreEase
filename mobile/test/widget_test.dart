@@ -4,6 +4,7 @@ import 'package:helen_store_mobile/main.dart';
 import 'package:helen_store_mobile/providers/cart_provider.dart';
 import 'package:helen_store_mobile/providers/debt_provider.dart';
 import 'package:helen_store_mobile/providers/product_provider.dart';
+import 'package:helen_store_mobile/providers/sales_provider.dart';
 import 'package:helen_store_mobile/services/api_service.dart';
 import 'package:helen_store_mobile/services/database_service.dart';
 import 'package:helen_store_mobile/services/storage_service.dart';
@@ -37,6 +38,7 @@ void main() {
           ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
           ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
           ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)..loadSales()),
         ],
         child: const HelensStoreApp(),
       ),
@@ -68,6 +70,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('Inventory Management'), findsOneWidget);
     expect(find.text('Add Product'), findsOneWidget);
+
+    // Tap Sales Tab
+    await tester.tap(find.text('Sales'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sales History'), findsOneWidget);
 
     // Tap Settings Tab
     await tester.tap(find.text('Settings'));

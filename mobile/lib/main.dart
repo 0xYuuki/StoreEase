@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/debt_provider.dart';
 import 'providers/product_provider.dart';
+import 'providers/sales_provider.dart';
 import 'screens/debts_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/pos_screen.dart';
@@ -29,6 +30,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
         ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
         ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+        ChangeNotifierProvider(create: (_) => SalesProvider(api: api)..loadSales()),
       ],
       child: const HelensStoreApp(),
     ),
@@ -82,6 +84,8 @@ class _HomeShellState extends State<HomeShell> {
             context.read<ProductProvider>().loadProducts();
           } else if (index == 1) {
             context.read<DebtProvider>().loadDebts();
+          } else if (index == 3) {
+            context.read<SalesProvider>().loadSales();
           }
         },
         items: const [

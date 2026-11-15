@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:helen_store_mobile/models/models.dart';
 import 'package:helen_store_mobile/providers/product_provider.dart';
+import 'package:helen_store_mobile/providers/sales_provider.dart';
 import 'package:helen_store_mobile/services/api_service.dart';
 import 'package:helen_store_mobile/services/database_service.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -280,6 +281,31 @@ void main() {
       expect(fetchedReceipt.totalAmount, 3300);
       expect(fetchedReceipt.items.length, 1);
       expect(fetchedReceipt.items.first.quantity, 3);
+    });
+
+    test('SalesProvider automatically syncs and retrieves sales after checkout', () async {
+      final api = ApiService(database: dbService);
+      final salesProv = SalesProvider(api: api);
+      await salesProv.loadSales();
+      final initialCount = salesProv.sales.length;
+
+      final egg = (await dbService.lookupBarcode('1'))!;
+      final receipt = await dbService.checkout(
+        items: [CartItem(product: egg, quantity: 2)],
+        tenderedAmount: 5000,
+      );
+
+      // Provider reloads sales
+      await salesProv.loadSales();
+      expect(salesProv.sales.length, initialCount + 1);
+      expect(salesProv.sales.first.id, receipt.saleId);
+      expect(salesProv.sales.first.totalAmount, 2200);
+
+      // Verify receipt retrieval through SalesProvider
+      final fetchedReceipt = await salesProv.getReceipt(receipt.saleId);
+      expect(fetchedReceipt.saleId, receipt.saleId);
+      expect(fetchedReceipt.items.first.productName, 'Egg');
+      expect(fetchedReceipt.items.first.quantity, 2);
     });
 
     test('Reset to sample data clears and restores initial dataset', () async {
