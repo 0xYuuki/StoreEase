@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../providers/cart_provider.dart';
 import '../providers/debt_provider.dart';
-import '../services/api_service.dart';
+import '../providers/product_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_dialogs.dart';
 
@@ -19,14 +19,12 @@ class _PosScreenState extends State<PosScreen> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _tenderedController = TextEditingController();
   bool _showScanner = false;
-  List<Product> _allProducts = [];
-  List<Product> _filteredProducts = [];
 
   @override
   void initState() {
     super.initState();
-    _loadProducts();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ProductProvider>().loadProducts();
       context.read<DebtProvider>().loadDebts();
     });
   }
@@ -38,43 +36,16 @@ class _PosScreenState extends State<PosScreen> {
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
-    try {
-      final api = context.read<ApiService>();
-      final products = await api.getProducts();
-      if (mounted) {
-        setState(() {
-          _allProducts = products;
-          _filteredProducts = products;
-        });
-      }
-    } catch (_) {}
-  }
-
-  void _onSearchChanged(String query) {
-    if (query.trim().isEmpty) {
-      setState(() => _filteredProducts = _allProducts);
-      return;
-    }
-    final q = query.toLowerCase();
-    setState(() {
-      _filteredProducts = _allProducts.where((p) {
-        return p.name.toLowerCase().contains(q) ||
-            p.barcodeString.toLowerCase().contains(q);
-      }).toList();
-    });
-  }
-
-  void _onBarcodeScanned(String barcode) {
+  Future<void> _onBarcodeScanned(String barcode) async {
     final clean = barcode.trim();
     if (clean.isEmpty) return;
 
-    final product = _allProducts.firstWhere(
-      (p) => p.barcodeString == clean,
-      orElse: () => Product(id: 0, barcodeString: '', name: '', priceCentavos: 0),
-    );
+    final productProv = context.read<ProductProvider>();
+    final product = await productProv.lookupBarcode(clean);
 
-    if (product.id != 0) {
+    if (!mounted) return;
+
+    if (product != null) {
       context.read<CartProvider>().addProduct(product);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -95,6 +66,7 @@ class _PosScreenState extends State<PosScreen> {
   Future<void> _handleCompleteSale() async {
     final cart = context.read<CartProvider>();
     final debtProv = context.read<DebtProvider>();
+    final productProv = context.read<ProductProvider>();
 
     if (cart.items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -127,6 +99,7 @@ class _PosScreenState extends State<PosScreen> {
         if (receipt != null && mounted) {
           _tenderedController.clear();
           debtProv.loadDebts();
+          productProv.loadProducts();
           await AppDialogs.showReceiptDialog(context, receipt);
         }
       } catch (e) {
@@ -144,6 +117,7 @@ class _PosScreenState extends State<PosScreen> {
         );
         if (receipt != null && mounted) {
           _tenderedController.clear();
+          productProv.loadProducts();
           await AppDialogs.showReceiptDialog(context, receipt);
         }
       } catch (e) {
@@ -159,6 +133,16 @@ class _PosScreenState extends State<PosScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final productProv = context.watch<ProductProvider>();
+    final allProducts = productProv.products;
+
+    final query = _searchController.text.trim().toLowerCase();
+    final filteredProducts = query.isEmpty
+        ? <Product>[]
+        : allProducts.where((p) {
+            return p.name.toLowerCase().contains(query) ||
+                p.barcodeString.toLowerCase().contains(query);
+          }).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -174,6 +158,11 @@ class _PosScreenState extends State<PosScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh Products',
+            onPressed: () => context.read<ProductProvider>().loadProducts(),
+          ),
           IconButton(
             icon: Icon(_showScanner ? Icons.camera_alt : Icons.camera_alt_outlined),
             color: _showScanner ? AppTheme.primaryGreen : AppTheme.textDark,
@@ -245,26 +234,26 @@ class _PosScreenState extends State<PosScreen> {
                         icon: const Icon(Icons.clear, size: 18),
                         onPressed: () {
                           _searchController.clear();
-                          _onSearchChanged('');
+                          setState(() {});
                         },
                       )
                     : null,
               ),
-              onChanged: _onSearchChanged,
+              onChanged: (_) => setState(() {}),
             ),
           ),
 
           // Instant Product Add Chips (if searching)
-          if (_searchController.text.isNotEmpty && _filteredProducts.isNotEmpty)
+          if (_searchController.text.isNotEmpty && filteredProducts.isNotEmpty)
             Container(
               height: 48,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: _filteredProducts.length,
+                itemCount: filteredProducts.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
-                  final p = _filteredProducts[index];
+                  final p = filteredProducts[index];
                   return ActionChip(
                     avatar: const Icon(Icons.add, size: 16),
                     label: Text('${p.name} (${p.formattedPrice})'),
@@ -281,15 +270,15 @@ class _PosScreenState extends State<PosScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey.shade400),
+                        Icon(Icons.point_of_sale_outlined, size: 64, color: Colors.grey.shade300),
                         const SizedBox(height: 12),
                         const Text(
-                          'Cart is empty',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+                          'Your cart is empty',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         const Text(
-                          'Scan a barcode or search products to begin',
+                          'Scan barcode or search products above to start sale',
                           style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                         ),
                       ],
@@ -303,7 +292,7 @@ class _PosScreenState extends State<PosScreen> {
                       final item = cart.items[index];
                       return Card(
                         child: Padding(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           child: Row(
                             children: [
                               Expanded(
@@ -312,7 +301,7 @@ class _PosScreenState extends State<PosScreen> {
                                   children: [
                                     Text(
                                       item.product.name,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
@@ -326,12 +315,12 @@ class _PosScreenState extends State<PosScreen> {
                                 children: [
                                   IconButton(
                                     icon: const Icon(Icons.remove_circle_outline, size: 22),
-                                    color: AppTheme.dangerRed,
+                                    color: AppTheme.textMuted,
                                     onPressed: () => cart.decrementQuantity(item.product.id),
                                   ),
                                   Text(
                                     '${item.quantity}',
-                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.add_circle_outline, size: 22),
@@ -341,9 +330,13 @@ class _PosScreenState extends State<PosScreen> {
                                 ],
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                item.formattedLineTotal,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              SizedBox(
+                                width: 70,
+                                child: Text(
+                                  item.formattedLineTotal,
+                                  textAlign: TextAlign.end,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
                               ),
                             ],
                           ),
@@ -353,86 +346,90 @@ class _PosScreenState extends State<PosScreen> {
                   ),
           ),
 
-          // Checkout Bottom Bar
+          // Checkout Bottom Dock
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(top: BorderSide(color: AppTheme.cardBorder)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  offset: const Offset(0, -2),
-                  blurRadius: 6,
+                  color: Colors.black.withValues(alpha: 0.05),
+                  offset: const Offset(0, -3),
+                  blurRadius: 10,
                 ),
               ],
             ),
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total (${cart.itemCount} items):',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        cart.formattedTotal,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryGreen,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'TOTAL (${cart.itemCount} items)',
+                      style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+                    ),
+                    Text(
+                      cart.formattedTotal,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.primaryDark),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 4,
+                      child: TextField(
+                        controller: _tenderedController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Cash Tendered (₱)',
+                          hintText: '0.00',
+                          prefixIcon: Icon(Icons.payments_outlined),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _tenderedController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: const InputDecoration(
-                            labelText: 'Cash Tendered',
-                            prefixText: '₱ ',
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Quick exact cash button
-                      OutlinedButton(
-                        onPressed: cart.items.isEmpty
-                            ? null
-                            : () {
-                                _tenderedController.text = cart.totalPesos.toStringAsFixed(2);
-                              },
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: OutlinedButton(
+                        onPressed: cart.totalCentavos > 0
+                            ? () {
+                                _tenderedController.text = (cart.totalCentavos / 100.0).toStringAsFixed(2);
+                              }
+                            : null,
                         child: const Text('Exact'),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: cart.items.isEmpty || cart.isLoading
-                          ? null
-                          : _handleCompleteSale,
-                      child: cart.isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Complete Sale', style: TextStyle(fontSize: 16)),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryGreen,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: cart.isLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check_circle_outline, color: Colors.white),
+                    label: Text(
+                      cart.isLoading ? 'Processing...' : 'Complete Sale',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    onPressed: (cart.items.isEmpty || cart.isLoading)
+                        ? null
+                        : _handleCompleteSale,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],

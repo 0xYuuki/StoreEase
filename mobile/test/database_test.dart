@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:helen_store_mobile/models/models.dart';
+import 'package:helen_store_mobile/providers/product_provider.dart';
+import 'package:helen_store_mobile/services/api_service.dart';
 import 'package:helen_store_mobile/services/database_service.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -71,6 +73,29 @@ void main() {
         ),
         throwsException,
       );
+    });
+
+    test('ProductProvider updates reactively and barcode lookup finds newly added products', () async {
+      final api = ApiService(database: dbService);
+      final productProv = ProductProvider(api: api);
+      await productProv.loadProducts();
+
+      final initialCount = productProv.products.length;
+
+      final created = await productProv.createProduct(
+        barcodeString: '777888999000',
+        name: 'Bear Brand Powdered Milk 33g',
+        priceCentavos: 1500,
+        initialStock: 20,
+      );
+
+      expect(productProv.products.length, initialCount + 1);
+      expect(productProv.products.any((p) => p.barcodeString == '777888999000'), true);
+
+      final found = await productProv.lookupBarcode('777888999000');
+      expect(found, isNotNull);
+      expect(found!.name, 'Bear Brand Powdered Milk 33g');
+      expect(found.id, created.id);
     });
 
     test('Barcode lookup returns matching active product', () async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/debt_provider.dart';
+import 'providers/product_provider.dart';
 import 'screens/debts_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/pos_screen.dart';
@@ -25,6 +26,7 @@ void main() async {
         Provider<DatabaseService>.value(value: database),
         Provider<StorageService>.value(value: storage),
         Provider<ApiService>.value(value: api),
+        ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
         ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
         ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
       ],
@@ -74,7 +76,14 @@ class _HomeShellState extends State<HomeShell> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (index) {
+          setState(() => _currentIndex = index);
+          if (index == 0 || index == 2) {
+            context.read<ProductProvider>().loadProducts();
+          } else if (index == 1) {
+            context.read<DebtProvider>().loadDebts();
+          }
+        },
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.point_of_sale),

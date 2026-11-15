@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
+import '../providers/product_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_dialogs.dart';
@@ -15,54 +16,19 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen> {
   final TextEditingController _searchController = TextEditingController();
-  List<Product> _products = [];
-  List<Product> _filtered = [];
-  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadProducts();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ProductProvider>().loadProducts();
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadProducts() async {
-    setState(() => _isLoading = true);
-    try {
-      final api = context.read<ApiService>();
-      final products = await api.getProducts();
-      setState(() {
-        _products = products;
-        _filterProducts(_searchController.text);
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load products: $e'), backgroundColor: AppTheme.dangerRed),
-        );
-      }
-    }
-  }
-
-  void _filterProducts(String query) {
-    if (query.trim().isEmpty) {
-      setState(() => _filtered = _products);
-      return;
-    }
-    final q = query.toLowerCase();
-    setState(() {
-      _filtered = _products.where((p) {
-        return p.name.toLowerCase().contains(q) ||
-            p.barcodeString.toLowerCase().contains(q);
-      }).toList();
-    });
   }
 
   Future<void> _showAddProductDialog() async {
@@ -207,12 +173,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         ? int.tryParse(reorderController.text.trim())
                         : null;
 
-                    final api = context.read<ApiService>();
+                    final productProv = context.read<ProductProvider>();
                     final messenger = ScaffoldMessenger.of(context);
                     final nav = Navigator.of(ctx);
 
                     try {
-                      await api.createProduct(
+                      await productProv.createProduct(
                         barcodeString: barcode,
                         name: name,
                         priceCentavos: priceCentavos,
@@ -236,7 +202,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
 
     if (saved == true && mounted) {
-      _loadProducts();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Product "${nameController.text.trim()}" added successfully!')),
       );
@@ -327,8 +292,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     final messenger = ScaffoldMessenger.of(context);
                     final navigator = Navigator.of(ctx);
                     try {
-                      final api = context.read<ApiService>();
-                      await api.adjustStock(product.id, delta, reason);
+                      final productProv = context.read<ProductProvider>();
+                      await productProv.adjustStock(product.id, delta, reason);
                       navigator.pop(true);
                     } catch (e) {
                       messenger.showSnackBar(
@@ -346,7 +311,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
 
     if (result == true && mounted) {
-      _loadProducts();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Stock for "${product.name}" updated')),
       );
@@ -356,6 +320,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final api = context.read<ApiService>();
+    final productProv = context.watch<ProductProvider>();
+    final allProducts = productProv.products;
+    final isLoading = productProv.isLoading;
+
+    final query = _searchController.text.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? allProducts
+        : allProducts.where((p) {
+            return p.name.toLowerCase().contains(query) ||
+                p.barcodeString.toLowerCase().contains(query);
+          }).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -369,7 +344,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
-            onPressed: _loadProducts,
+            onPressed: () => context.read<ProductProvider>().loadProducts(),
           ),
         ],
       ),
@@ -394,18 +369,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         icon: const Icon(Icons.clear, size: 18),
                         onPressed: () {
                           _searchController.clear();
-                          _filterProducts('');
+                          setState(() {});
                         },
                       )
                     : null,
               ),
-              onChanged: _filterProducts,
+              onChanged: (_) => setState(() {}),
             ),
           ),
           Expanded(
-            child: _isLoading
+            child: isLoading && allProducts.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : _filtered.isEmpty
+                : filtered.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -418,10 +393,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       )
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-                        itemCount: _filtered.length,
+                        itemCount: filtered.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
-                          final product = _filtered[index];
+                          final product = filtered[index];
                           final hasStock = product.stock != null;
                           final isLow = product.isLowStock;
 
@@ -432,7 +407,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 AppDialogs.showStockHistoryDialog(context, product, api);
                               },
                               child: Padding(
-                            padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(12),
                                 child: Row(
                                   children: [
                                     Expanded(

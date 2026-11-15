@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:helen_store_mobile/main.dart';
 import 'package:helen_store_mobile/providers/cart_provider.dart';
 import 'package:helen_store_mobile/providers/debt_provider.dart';
+import 'package:helen_store_mobile/providers/product_provider.dart';
 import 'package:helen_store_mobile/services/api_service.dart';
 import 'package:helen_store_mobile/services/database_service.dart';
 import 'package:helen_store_mobile/services/storage_service.dart';
@@ -33,6 +34,7 @@ void main() {
           Provider<DatabaseService>.value(value: db),
           Provider<StorageService>.value(value: storage),
           Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
           ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
           ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
         ],
