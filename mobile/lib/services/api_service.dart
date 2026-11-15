@@ -123,7 +123,11 @@ class ApiService {
   }
 
   // Analytics Dashboard
-  Future<AnalyticsData> getAnalytics() async {
-    return await database.getAnalytics();
+  Future<AnalyticsData> getAnalytics({SalesTrendPeriod period = SalesTrendPeriod.days}) async {
+    return await database.getAnalytics(period: period);
+  }
+
+  Future<ChartData> getSalesTrend(SalesTrendPeriod period) async {
+    return await database.getSalesTrend(period);
   }
 }

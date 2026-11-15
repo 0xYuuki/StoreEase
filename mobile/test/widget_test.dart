@@ -92,7 +92,11 @@ void main() {
     expect(find.text('Sales Analytics'), findsOneWidget);
     expect(find.text('Overview & Revenue'), findsOneWidget);
     expect(find.text("Today's Sales"), findsOneWidget);
-    expect(find.text('Sales Trend (Last 7 Days)'), findsOneWidget);
+    expect(find.text('Sales Trend (Days)'), findsOneWidget);
+    expect(find.text('Days'), findsOneWidget);
+    expect(find.text('Week'), findsOneWidget);
+    expect(find.text('Months'), findsOneWidget);
+    expect(find.text('Year'), findsOneWidget);
 
     // Tap Settings Tab
     await tester.tap(find.text('Settings'));
@@ -289,6 +293,74 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('Sale #1'), findsOneWidget);
+
+    await db.close();
+  });
+
+  testWidgets('AnalyticsScreen allows switching Sales Trend period between Days, Week, Months, and Year', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)..loadAnalytics()),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Navigate to Analytics
+    await tester.tap(find.text('Analytics'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Default period is Days
+    expect(find.text('Sales Trend (Days)'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Daily Average: ₱0.00'), findsOneWidget);
+
+    // Tap Week
+    await tester.tap(find.text('Week'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sales Trend (Week)'), findsOneWidget);
+    expect(find.text('This Wk'), findsOneWidget);
+    expect(find.text('Weekly Average: ₱0.00'), findsOneWidget);
+
+    // Tap Months
+    await tester.tap(find.text('Months'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sales Trend (Months)'), findsOneWidget);
+    expect(find.text('This Mo'), findsOneWidget);
+    expect(find.text('Monthly Average: ₱0.00'), findsOneWidget);
+
+    // Tap Year
+    await tester.tap(find.text('Year'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sales Trend (Year)'), findsOneWidget);
+    expect(find.text('This Yr'), findsOneWidget);
+    expect(find.text('Annual Average: ₱0.00'), findsOneWidget);
+
+    // Switch back to Days
+    await tester.tap(find.text('Days'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sales Trend (Days)'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
 
     await db.close();
   });

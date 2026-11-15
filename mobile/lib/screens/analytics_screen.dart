@@ -79,8 +79,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                           const SizedBox(height: 20),
 
-                          // --- 2. Sales Trend Chart (Last 7 Days) ---
-                          _buildSalesTrendCard(data.chartData),
+                          // --- 2. Sales Trend Chart (Days, Week, Months, Year) ---
+                          _buildSalesTrendCard(data.chartData, prov.trendPeriod),
 
                           const SizedBox(height: 20),
 
@@ -230,11 +230,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _buildSalesTrendCard(ChartData chart) {
-    final maxCentavos = chart.data.isEmpty ? 0 : chart.data.reduce(max);
-    final total7DaysCentavos = chart.data.fold<int>(0, (sum, val) => sum + val);
-    final total7DaysPesos = total7DaysCentavos / 100.0;
-    final average7DaysPesos = total7DaysPesos / 7.0;
+  Widget _buildSalesTrendCard(ChartData chart, SalesTrendPeriod period) {
+    final maxCentavos = chart.peakCentavos;
+    final totalCentavos = chart.totalCentavos;
+    final totalPesos = totalCentavos / 100.0;
+    final averagePesos = chart.averagePesos;
 
     return Card(
       shape: RoundedRectangleBorder(
@@ -249,13 +249,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.show_chart, color: AppTheme.primaryGreen, size: 20),
-                    SizedBox(width: 8),
+                    const Icon(Icons.show_chart, color: AppTheme.primaryGreen, size: 20),
+                    const SizedBox(width: 8),
                     Text(
-                      'Sales Trend (Last 7 Days)',
-                      style: TextStyle(
+                      _trendPeriodTitle(period),
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.textDark,
@@ -270,7 +270,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'Total: ₱${total7DaysPesos.toStringAsFixed(0)}',
+                    'Total: ₱${totalPesos.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -280,7 +280,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
+
+            // Period Selection Tabs: Days | Week | Months | Year
+            _buildPeriodSelector(period),
+
+            const SizedBox(height: 16),
 
             // Bar Chart Area
             SizedBox(
@@ -291,13 +296,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   final label = chart.labels[index];
                   final centavos = chart.data[index];
                   final pesos = centavos / 100.0;
-                  final isToday = index == chart.labels.length - 1;
+                  final isCurrent = index == chart.labels.length - 1;
 
-                  // Parse label date for short day display (e.g. "Mon" or "15")
-                  final parsedDate = DateTime.tryParse(label);
-                  final dayLabel = isToday
-                      ? 'Today'
-                      : (parsedDate != null ? _shortWeekday(parsedDate.weekday) : label.split('-').last);
+                  final dayLabel = _formatBucketLabel(label, period, isCurrent);
 
                   // Calculate ratio: minimum height 6px so 0 is still visible as a notch
                   final ratio = maxCentavos > 0 ? (centavos / maxCentavos) : 0.0;
@@ -305,7 +306,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                   return Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 2.5),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -317,7 +318,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 style: TextStyle(
                                   fontSize: 9,
                                   fontWeight: FontWeight.bold,
-                                  color: isToday ? AppTheme.primaryDark : AppTheme.textMuted,
+                                  color: isCurrent ? AppTheme.primaryDark : AppTheme.textMuted,
                                 ),
                               ),
                             )
@@ -327,22 +328,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           Container(
                             height: barHeight,
                             decoration: BoxDecoration(
-                              color: isToday
+                              color: isCurrent
                                   ? AppTheme.primaryGreen
                                   : (centavos > 0 ? AppTheme.accentGreen.withValues(alpha: 0.6) : Colors.grey.shade300),
                               borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                              border: isToday
+                              border: isCurrent
                                   ? Border.all(color: AppTheme.primaryDark, width: 1.5)
                                   : null,
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            dayLabel,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                              color: isToday ? AppTheme.primaryDark : AppTheme.textMuted,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              dayLabel,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                                color: isCurrent ? AppTheme.primaryDark : AppTheme.textMuted,
+                              ),
                             ),
                           ),
                         ],
@@ -357,7 +361,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Daily Average: ₱${average7DaysPesos.toStringAsFixed(2)}',
+                  _trendAverageLabel(period, averagePesos),
                   style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                 ),
                 Text(
@@ -370,6 +374,105 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildPeriodSelector(SalesTrendPeriod currentPeriod) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9), // Slate 100
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        children: [
+          _buildPeriodTab(label: 'Days', period: SalesTrendPeriod.days, current: currentPeriod),
+          _buildPeriodTab(label: 'Week', period: SalesTrendPeriod.week, current: currentPeriod),
+          _buildPeriodTab(label: 'Months', period: SalesTrendPeriod.months, current: currentPeriod),
+          _buildPeriodTab(label: 'Year', period: SalesTrendPeriod.year, current: currentPeriod),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPeriodTab({
+    required String label,
+    required SalesTrendPeriod period,
+    required SalesTrendPeriod current,
+  }) {
+    final isSelected = period == current;
+    return Expanded(
+      child: GestureDetector(
+        key: Key('trend_period_$label'),
+        onTap: () => context.read<AnalyticsProvider>().setTrendPeriod(period),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? AppTheme.primaryDark : AppTheme.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _trendPeriodTitle(SalesTrendPeriod period) {
+    switch (period) {
+      case SalesTrendPeriod.days:
+        return 'Sales Trend (Days)';
+      case SalesTrendPeriod.week:
+        return 'Sales Trend (Week)';
+      case SalesTrendPeriod.months:
+        return 'Sales Trend (Months)';
+      case SalesTrendPeriod.year:
+        return 'Sales Trend (Year)';
+    }
+  }
+
+  String _trendAverageLabel(SalesTrendPeriod period, double averagePesos) {
+    switch (period) {
+      case SalesTrendPeriod.days:
+        return 'Daily Average: ₱${averagePesos.toStringAsFixed(2)}';
+      case SalesTrendPeriod.week:
+        return 'Weekly Average: ₱${averagePesos.toStringAsFixed(2)}';
+      case SalesTrendPeriod.months:
+        return 'Monthly Average: ₱${averagePesos.toStringAsFixed(2)}';
+      case SalesTrendPeriod.year:
+        return 'Annual Average: ₱${averagePesos.toStringAsFixed(2)}';
+    }
+  }
+
+  String _formatBucketLabel(String label, SalesTrendPeriod period, bool isCurrent) {
+    switch (period) {
+      case SalesTrendPeriod.days:
+        if (isCurrent) return 'Today';
+        final parsedDate = DateTime.tryParse(label);
+        return parsedDate != null ? _shortWeekday(parsedDate.weekday) : label.split('-').last;
+      case SalesTrendPeriod.week:
+        return isCurrent ? 'This Wk' : label;
+      case SalesTrendPeriod.months:
+        return isCurrent ? 'This Mo' : label;
+      case SalesTrendPeriod.year:
+        return isCurrent ? 'This Yr' : label;
+    }
   }
 
   Widget _buildPopularItemsCard(List<PopularItem> items) {

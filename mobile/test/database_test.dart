@@ -341,10 +341,32 @@ void main() {
       expect(popularEgg.timesSold, 4);
       expect(popularEgg.revenue, 4400);
 
-      // Verify 7-day trend
+      // Verify default days trend
+      expect(data.chartData.period, SalesTrendPeriod.days);
       expect(data.chartData.labels.length, 7);
       expect(data.chartData.data.length, 7);
       expect(data.chartData.data.last >= 6800, true);
+
+      // Verify Weekly trend
+      final weeklyTrend = await dbService.getSalesTrend(SalesTrendPeriod.week);
+      expect(weeklyTrend.period, SalesTrendPeriod.week);
+      expect(weeklyTrend.labels.length, 7);
+      expect(weeklyTrend.data.length, 7);
+      expect(weeklyTrend.data.last >= 6800, true);
+
+      // Verify Monthly trend
+      final monthlyTrend = await dbService.getSalesTrend(SalesTrendPeriod.months);
+      expect(monthlyTrend.period, SalesTrendPeriod.months);
+      expect(monthlyTrend.labels.length, 6);
+      expect(monthlyTrend.data.length, 6);
+      expect(monthlyTrend.data.last >= 6800, true);
+
+      // Verify Yearly trend
+      final yearlyTrend = await dbService.getSalesTrend(SalesTrendPeriod.year);
+      expect(yearlyTrend.period, SalesTrendPeriod.year);
+      expect(yearlyTrend.labels.length, 5);
+      expect(yearlyTrend.data.length, 5);
+      expect(yearlyTrend.data.last >= 6800, true);
     });
 
     test('getSales filters records by date range, customer, item name, and receipt ID', () async {

@@ -347,27 +347,47 @@ class PopularItem {
   };
 }
 
+enum SalesTrendPeriod {
+  days,
+  week,
+  months,
+  year,
+}
+
 class ChartData {
   final List<String> labels; // e.g. ['2026-11-09', ..., '2026-11-15']
   final List<int> data; // centavos
+  final SalesTrendPeriod period;
 
   ChartData({
     required this.labels,
     required this.data,
+    this.period = SalesTrendPeriod.days,
   });
+
+  int get totalCentavos => data.fold<int>(0, (sum, val) => sum + val);
+  double get averagePesos => data.isEmpty ? 0.0 : (totalCentavos / 100.0) / data.length;
+  int get peakCentavos => data.isEmpty ? 0 : data.fold<int>(0, (prev, elem) => elem > prev ? elem : prev);
 
   factory ChartData.fromJson(Map<String, dynamic> json) {
     final rawLabels = json['labels'] as List<dynamic>? ?? [];
     final rawData = json['data'] as List<dynamic>? ?? [];
+    final rawPeriod = json['period'] as String? ?? 'days';
+    final period = SalesTrendPeriod.values.firstWhere(
+      (p) => p.name == rawPeriod,
+      orElse: () => SalesTrendPeriod.days,
+    );
     return ChartData(
       labels: rawLabels.map((e) => e.toString()).toList(),
       data: rawData.map((e) => (e as num).toInt()).toList(),
+      period: period,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'labels': labels,
     'data': data,
+    'period': period.name,
   };
 }
 

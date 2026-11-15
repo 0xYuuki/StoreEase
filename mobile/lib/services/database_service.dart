@@ -823,7 +823,7 @@ class DatabaseService {
 
   // --- ANALYTICS DASHBOARD ---
 
-  Future<AnalyticsData> getAnalytics() async {
+  Future<AnalyticsData> getAnalytics({SalesTrendPeriod period = SalesTrendPeriod.days}) async {
     final now = DateTime.now();
 
     // Local day calculations
@@ -871,40 +871,163 @@ class DatabaseService {
       revenue: (r['revenue'] as num?)?.toInt() ?? 0,
     )).toList();
 
-    // 3. 7-Day Trend Chart
-    final dates = List.generate(7, (i) {
-      final d = todayStart.subtract(Duration(days: 6 - i));
-      return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-    });
-
-    final sevenDaysStart = '${dates.first}T00:00:00';
-    final chartRows = await db.rawQuery('''
-      SELECT 
-        substr(timestamp, 1, 10) AS sale_date,
-        SUM(total_amount) AS total
-      FROM Sales
-      WHERE timestamp >= ? AND timestamp < ?
-      GROUP BY sale_date
-    ''', [sevenDaysStart, tomorrowStart.toIso8601String()]);
-
-    final Map<String, int> dailyTotals = {};
-    for (final r in chartRows) {
-      final date = r['sale_date'] as String?;
-      if (date != null) {
-        dailyTotals[date] = (r['total'] as num?)?.toInt() ?? 0;
-      }
-    }
-
-    final chartData = ChartData(
-      labels: dates,
-      data: dates.map((d) => dailyTotals[d] ?? 0).toList(),
-    );
+    // 3. Sales Trend Chart
+    final chartData = await getSalesTrend(period);
 
     return AnalyticsData(
       kpis: kpis,
       popularItems: popularItems,
       chartData: chartData,
     );
+  }
+
+  Future<ChartData> getSalesTrend(SalesTrendPeriod period) async {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final tomorrowStart = todayStart.add(const Duration(days: 1));
+
+    switch (period) {
+      case SalesTrendPeriod.days:
+        final dates = List.generate(7, (i) {
+          final d = todayStart.subtract(Duration(days: 6 - i));
+          return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        });
+
+        final sevenDaysStart = '${dates.first}T00:00:00';
+        final chartRows = await db.rawQuery('''
+          SELECT 
+            substr(timestamp, 1, 10) AS sale_date,
+            SUM(total_amount) AS total
+          FROM Sales
+          WHERE timestamp >= ? AND timestamp < ?
+          GROUP BY sale_date
+        ''', [sevenDaysStart, tomorrowStart.toIso8601String()]);
+
+        final Map<String, int> dailyTotals = {};
+        for (final r in chartRows) {
+          final date = r['sale_date'] as String?;
+          if (date != null) {
+            dailyTotals[date] = (r['total'] as num?)?.toInt() ?? 0;
+          }
+        }
+
+        return ChartData(
+          period: SalesTrendPeriod.days,
+          labels: dates,
+          data: dates.map((d) => dailyTotals[d] ?? 0).toList(),
+        );
+
+      case SalesTrendPeriod.week:
+        final daysSinceSunday = todayStart.weekday % 7;
+        final currentWeekStart = todayStart.subtract(Duration(days: daysSinceSunday));
+
+        final weekStarts = List.generate(7, (i) {
+          return currentWeekStart.subtract(Duration(days: 7 * (6 - i)));
+        });
+        final rangeStart = weekStarts.first.toIso8601String();
+
+        final chartRows = await db.rawQuery('''
+          SELECT 
+            timestamp,
+            total_amount
+          FROM Sales
+          WHERE timestamp >= ? AND timestamp < ?
+        ''', [rangeStart, tomorrowStart.toIso8601String()]);
+
+        final weekTotals = List.filled(7, 0);
+        for (final r in chartRows) {
+          final ts = r['timestamp'] as String?;
+          final total = (r['total_amount'] as num?)?.toInt() ?? 0;
+          if (ts == null) continue;
+          final dt = DateTime.tryParse(ts);
+          if (dt == null) continue;
+
+          for (int i = 0; i < 7; i++) {
+            final start = weekStarts[i];
+            final end = i < 6 ? weekStarts[i + 1] : tomorrowStart;
+            if (!dt.isBefore(start) && dt.isBefore(end)) {
+              weekTotals[i] += total;
+              break;
+            }
+          }
+        }
+
+        final labels = weekStarts.map((w) => '${w.month}/${w.day}').toList();
+
+        return ChartData(
+          period: SalesTrendPeriod.week,
+          labels: labels,
+          data: weekTotals,
+        );
+
+      case SalesTrendPeriod.months:
+        final monthStarts = List.generate(6, (i) {
+          final monthOffset = 5 - i;
+          return DateTime(now.year, now.month - monthOffset, 1);
+        });
+        final rangeStart = monthStarts.first.toIso8601String();
+        final nextMonthStart = DateTime(now.year, now.month + 1, 1).toIso8601String();
+
+        final chartRows = await db.rawQuery('''
+          SELECT 
+            substr(timestamp, 1, 7) AS month_key,
+            SUM(total_amount) AS total
+          FROM Sales
+          WHERE timestamp >= ? AND timestamp < ?
+          GROUP BY month_key
+        ''', [rangeStart, nextMonthStart]);
+
+        final Map<String, int> monthTotals = {};
+        for (final r in chartRows) {
+          final key = r['month_key'] as String?;
+          if (key != null) {
+            monthTotals[key] = (r['total'] as num?)?.toInt() ?? 0;
+          }
+        }
+
+        final monthKeys = monthStarts.map((d) {
+          return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}';
+        }).toList();
+
+        const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        final labels = monthStarts.map((d) => monthNames[d.month]).toList();
+
+        return ChartData(
+          period: SalesTrendPeriod.months,
+          labels: labels,
+          data: monthKeys.map((k) => monthTotals[k] ?? 0).toList(),
+        );
+
+      case SalesTrendPeriod.year:
+        final years = List.generate(5, (i) => now.year - (4 - i));
+        final rangeStart = DateTime(years.first, 1, 1).toIso8601String();
+        final nextYearStart = DateTime(now.year + 1, 1, 1).toIso8601String();
+
+        final chartRows = await db.rawQuery('''
+          SELECT 
+            substr(timestamp, 1, 4) AS year_key,
+            SUM(total_amount) AS total
+          FROM Sales
+          WHERE timestamp >= ? AND timestamp < ?
+          GROUP BY year_key
+        ''', [rangeStart, nextYearStart]);
+
+        final Map<String, int> yearTotals = {};
+        for (final r in chartRows) {
+          final key = r['year_key'] as String?;
+          if (key != null) {
+            yearTotals[key] = (r['total'] as num?)?.toInt() ?? 0;
+          }
+        }
+
+        final labels = years.map((y) => y.toString()).toList();
+
+        return ChartData(
+          period: SalesTrendPeriod.year,
+          labels: labels,
+          data: labels.map((y) => yearTotals[y] ?? 0).toList(),
+        );
+    }
   }
 
   Future<int> _sumSalesBetween(String start, String end) async {

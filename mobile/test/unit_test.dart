@@ -166,6 +166,29 @@ void main() {
       expect(analytics.chartData.labels.length, 7);
       expect(analytics.chartData.data.length, 7);
       expect(analytics.chartData.data.last, 45000);
+      expect(analytics.chartData.period, SalesTrendPeriod.days);
+      expect(analytics.chartData.totalCentavos, 157000);
+      expect(analytics.chartData.peakCentavos, 45000);
+      expect(analytics.chartData.averagePesos, closeTo(224.28, 0.01));
+    });
+
+    test('ChartData serializes and deserializes period correctly', () {
+      final chart = ChartData(
+        labels: ['Jan', 'Feb', 'Mar'],
+        data: [1000, 2000, 3000],
+        period: SalesTrendPeriod.months,
+      );
+
+      final json = chart.toJson();
+      expect(json['period'], 'months');
+
+      final fromJson = ChartData.fromJson(json);
+      expect(fromJson.period, SalesTrendPeriod.months);
+      expect(fromJson.labels, ['Jan', 'Feb', 'Mar']);
+      expect(fromJson.data, [1000, 2000, 3000]);
+      expect(fromJson.totalCentavos, 6000);
+      expect(fromJson.peakCentavos, 3000);
+      expect(fromJson.averagePesos, 20.0);
     });
   });
 }
