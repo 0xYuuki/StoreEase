@@ -61,20 +61,18 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    PosScreen(),
-    DebtsScreen(),
-    InventoryScreen(),
-    SalesScreen(),
-    SettingsScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: [
+          PosScreen(isActive: _currentIndex == 0),
+          const DebtsScreen(),
+          const InventoryScreen(),
+          const SalesScreen(),
+          const SettingsScreen(),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,

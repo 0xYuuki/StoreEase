@@ -87,4 +87,62 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('POS camera scanner automatically shuts down when switching tabs and stays closed on return', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)..loadSales()),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Initially scanner is closed (outlined camera icon)
+    expect(find.byIcon(Icons.camera_alt_outlined), findsOneWidget);
+    expect(find.text('Point camera at product barcode'), findsNothing);
+
+    // Tap to open scanner
+    await tester.tap(find.byIcon(Icons.camera_alt_outlined));
+    await tester.pump();
+
+    // Now scanner is open (filled camera icon and viewfinder hint)
+    expect(find.byIcon(Icons.camera_alt), findsOneWidget);
+    expect(find.text('Point camera at product barcode'), findsOneWidget);
+
+    // Switch to Inventory tab
+    await tester.tap(find.text('Inventory'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // While on Inventory tab, POS scanner is unmounted and not running
+    expect(find.text('Inventory Management'), findsOneWidget);
+    expect(find.text('Point camera at product barcode'), findsNothing);
+
+    // Switch back to POS tab
+    await tester.tap(find.text('POS'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Scanner is automatically closed (not left running)
+    expect(find.byIcon(Icons.camera_alt_outlined), findsOneWidget);
+    expect(find.text('Point camera at product barcode'), findsNothing);
+
+    await db.close();
+  });
 }

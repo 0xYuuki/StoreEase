@@ -12,13 +12,14 @@ import '../theme/app_theme.dart';
 import '../widgets/app_dialogs.dart';
 
 class PosScreen extends StatefulWidget {
-  const PosScreen({super.key});
+  final bool isActive;
+  const PosScreen({super.key, this.isActive = true});
 
   @override
   State<PosScreen> createState() => _PosScreenState();
 }
 
-class _PosScreenState extends State<PosScreen> {
+class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _tenderedController = TextEditingController();
   bool _showScanner = false;
@@ -32,6 +33,7 @@ class _PosScreenState extends State<PosScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProductProvider>().loadProducts();
       context.read<DebtProvider>().loadDebts();
@@ -39,13 +41,42 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant PosScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.isActive && oldWidget.isActive) {
+      // User navigated away from the POS tab - shut down camera immediately
+      if (_showScanner) {
+        setState(() {
+          _showScanner = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      // App minimized or screen locked - turn off scanner
+      if (_showScanner) {
+        setState(() {
+          _showScanner = false;
+        });
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     _tenderedController.dispose();
     super.dispose();
   }
 
   void _handleBarcodeDetect(String rawBarcode) {
+    // Strict guard: do not process scans if tab is inactive or scanner is closed
+    if (!widget.isActive || !_showScanner) return;
+
     final clean = rawBarcode.trim();
     if (clean.isEmpty) return;
 
@@ -147,6 +178,9 @@ class _PosScreenState extends State<PosScreen> {
           newDebtorName: result.newDebtorName,
         );
         if (receipt != null && mounted) {
+          if (_showScanner) {
+            setState(() => _showScanner = false);
+          }
           _tenderedController.clear();
           debtProv.loadDebts();
           productProv.loadProducts();
@@ -170,6 +204,9 @@ class _PosScreenState extends State<PosScreen> {
           tenderedAmountCentavos: tenderedCentavos,
         );
         if (receipt != null && mounted) {
+          if (_showScanner) {
+            setState(() => _showScanner = false);
+          }
           _tenderedController.clear();
           productProv.loadProducts();
           context.read<SalesProvider>().loadSales();
@@ -238,7 +275,7 @@ class _PosScreenState extends State<PosScreen> {
       body: Column(
         children: [
           // Camera Barcode Scanner View (collapsible)
-          if (_showScanner)
+          if (_showScanner && widget.isActive)
             Container(
               height: 200,
               color: Colors.black,
@@ -340,21 +377,24 @@ class _PosScreenState extends State<PosScreen> {
           Expanded(
             child: cart.items.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.point_of_sale_outlined, size: 64, color: Colors.grey.shade300),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Your cart is empty',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Scan barcode or search products above to start sale',
-                          style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                        ),
-                      ],
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.point_of_sale_outlined, size: 48, color: Colors.grey.shade300),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Your cart is empty',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Scan barcode or search products above to start sale',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : ListView.separated(
