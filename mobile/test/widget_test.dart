@@ -419,4 +419,70 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('POS displays Loose Items and By Weight filter chips and filters products', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    // Add a loose item and a weighted item
+    await db.createProduct(
+      name: 'Fresh Egg',
+      priceCentavos: 800,
+      initialStock: 20,
+      isBarcodeless: true,
+    );
+    await db.createProduct(
+      name: 'Sinandomeng Rice',
+      priceCentavos: 5200,
+      initialStock: 50.0,
+      pricingType: 'weight',
+      unit: 'kg',
+      isBarcodeless: true,
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify filter chips exist on POS screen
+    expect(find.text('All Items'), findsOneWidget);
+    expect(find.text('Loose Items (No Barcode)'), findsOneWidget);
+    expect(find.text('By Weight (Timbang)'), findsOneWidget);
+
+    // Tap Loose Items filter chip
+    await tester.tap(find.text('Loose Items (No Barcode)'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Fresh Egg and Sinandomeng Rice (both barcodeless) appear in preview list
+    expect(find.text('Fresh Egg'), findsOneWidget);
+    expect(find.text('Sinandomeng Rice'), findsOneWidget);
+
+    // Tap By Weight filter chip
+    await tester.tap(find.text('By Weight (Timbang)'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Only Sinandomeng Rice appears under By Weight
+    expect(find.text('Sinandomeng Rice'), findsOneWidget);
+    expect(find.text('Fresh Egg'), findsNothing);
+
+    await db.close();
+  });
 }

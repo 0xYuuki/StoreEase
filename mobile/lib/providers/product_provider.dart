@@ -48,12 +48,15 @@ class ProductProvider extends ChangeNotifier {
   }
 
   Future<Product> createProduct({
-    required String barcodeString,
+    String? barcodeString,
     required String name,
     required int priceCentavos,
-    int? initialStock,
-    int? reorderLevel,
+    num? initialStock,
+    num? reorderLevel,
     String category = 'General',
+    String pricingType = 'unit',
+    String unit = 'pc',
+    bool isBarcodeless = false,
   }) async {
     try {
       final newProduct = await api.createProduct(
@@ -63,6 +66,9 @@ class ProductProvider extends ChangeNotifier {
         initialStock: initialStock,
         reorderLevel: reorderLevel,
         category: category,
+        pricingType: pricingType,
+        unit: unit,
+        isBarcodeless: isBarcodeless,
       );
       await loadProducts();
       return newProduct;
@@ -73,7 +79,7 @@ class ProductProvider extends ChangeNotifier {
     }
   }
 
-  Future<Product> adjustStock(int productId, int delta, String reason) async {
+  Future<Product> adjustStock(int productId, num delta, String reason) async {
     try {
       final updated = await api.adjustStock(productId, delta, reason);
       await loadProducts();

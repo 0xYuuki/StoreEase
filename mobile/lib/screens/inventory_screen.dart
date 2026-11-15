@@ -52,6 +52,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final customCategoryController = TextEditingController();
     String selectedCategory = 'General';
     bool isCustomCategory = false;
+    bool isBarcodeless = false;
+    String pricingType = 'unit'; // 'unit' or 'weight'
+    String unit = 'pc';
 
     String generateRandomBarcode() {
       final random = Random();
@@ -83,24 +86,43 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      controller: barcodeController,
-                      decoration: InputDecoration(
-                        labelText: 'Barcode / Scan Code',
-                        hintText: 'Enter or generate barcode...',
-                        prefixIcon: const Icon(Icons.qr_code),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.casino_outlined),
-                          tooltip: 'Generate Random Barcode',
-                          onPressed: () {
-                            setDialogState(() {
-                              barcodeController.text = generateRandomBarcode();
-                            });
-                          },
+                    // Loose / No Barcode Toggle
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text('Loose Item / No Barcode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      subtitle: const Text('Auto-generates clean PLU identifier', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      value: isBarcodeless,
+                      activeColor: AppTheme.primaryGreen,
+                      onChanged: (val) {
+                        setDialogState(() {
+                          isBarcodeless = val ?? false;
+                          if (isBarcodeless) {
+                            barcodeController.clear();
+                          }
+                        });
+                      },
+                    ),
+                    if (!isBarcodeless) ...[
+                      TextField(
+                        controller: barcodeController,
+                        decoration: InputDecoration(
+                          labelText: 'Barcode / Scan Code',
+                          hintText: 'Enter or generate barcode...',
+                          prefixIcon: const Icon(Icons.qr_code),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.casino_outlined),
+                            tooltip: 'Generate Random Barcode',
+                            onPressed: () {
+                              setDialogState(() {
+                                barcodeController.text = generateRandomBarcode();
+                              });
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
+                    ],
                     TextField(
                       controller: nameController,
                       textCapitalization: TextCapitalization.words,
@@ -147,14 +169,90 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                     ],
                     const SizedBox(height: 12),
+
+                    // Pricing Type Selector (By Piece vs By Weight)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.all(3),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setDialogState(() {
+                                  pricingType = 'unit';
+                                  unit = 'pc';
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: pricingType == 'unit' ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: pricingType == 'unit'
+                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
+                                      : null,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '📦 By Piece (pc)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: pricingType == 'unit' ? AppTheme.primaryDark : AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setDialogState(() {
+                                  pricingType = 'weight';
+                                  unit = 'kg';
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: pricingType == 'weight' ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: pricingType == 'weight'
+                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
+                                      : null,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '⚖️ By Weight (kg)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: pricingType == 'weight' ? AppTheme.primaryDark : AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
                     TextField(
                       controller: priceController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Price (₱)',
+                      decoration: InputDecoration(
+                        labelText: pricingType == 'weight' ? 'Price per kg (₱)' : 'Price per piece (₱)',
                         hintText: '0.00',
                         prefixText: '₱ ',
-                        prefixIcon: Icon(Icons.payments_outlined),
+                        prefixIcon: const Icon(Icons.payments_outlined),
+                        suffixText: pricingType == 'weight' ? '/ kg' : '/ pc',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -163,11 +261,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         Expanded(
                           child: TextField(
                             controller: stockController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Initial Stock',
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: pricingType == 'weight' ? 'Initial Stock (kg)' : 'Initial Stock (pcs)',
                               hintText: 'Optional',
-                              prefixIcon: Icon(Icons.inventory_2_outlined),
+                              prefixIcon: const Icon(Icons.inventory_2_outlined),
                             ),
                           ),
                         ),
@@ -175,11 +273,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         Expanded(
                           child: TextField(
                             controller: reorderController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Reorder Alert',
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: pricingType == 'weight' ? 'Reorder Alert (kg)' : 'Reorder Alert (pcs)',
                               hintText: 'Optional',
-                              prefixIcon: Icon(Icons.warning_amber_outlined),
+                              prefixIcon: const Icon(Icons.warning_amber_outlined),
                             ),
                           ),
                         ),
@@ -200,9 +298,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     final name = nameController.text.trim();
                     final priceText = priceController.text.trim();
 
-                    if (barcode.isEmpty) {
+                    if (!isBarcodeless && barcode.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please enter or generate a barcode'), backgroundColor: AppTheme.dangerRed),
+                        const SnackBar(content: Text('Please enter/scan a barcode or check Loose Item'), backgroundColor: AppTheme.dangerRed),
                       );
                       return;
                     }
@@ -222,10 +320,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
                     final priceCentavos = (pricePesos * 100).round();
                     final initialStock = stockController.text.trim().isNotEmpty
-                        ? int.tryParse(stockController.text.trim())
+                        ? double.tryParse(stockController.text.trim())
                         : null;
                     final reorderLevel = reorderController.text.trim().isNotEmpty
-                        ? int.tryParse(reorderController.text.trim())
+                        ? double.tryParse(reorderController.text.trim())
                         : null;
 
                     final categoryToSave = isCustomCategory
@@ -239,12 +337,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
                     try {
                       await productProv.createProduct(
-                        barcodeString: barcode,
+                        barcodeString: isBarcodeless ? null : barcode,
                         name: name,
                         priceCentavos: priceCentavos,
                         initialStock: initialStock,
                         reorderLevel: reorderLevel,
                         category: finalCategory,
+                        pricingType: pricingType,
+                        unit: unit,
+                        isBarcodeless: isBarcodeless,
                       );
                       nav.pop(true);
                     } catch (e) {
@@ -286,7 +387,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Current Stock: ${product.stock != null ? '${product.stock} units' : 'Untracked'}',
+                    'Current Stock: ${product.stock != null ? product.formattedStock : 'Untracked'}',
                     style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textMuted),
                   ),
                   const SizedBox(height: 12),
@@ -314,10 +415,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   const SizedBox(height: 14),
                   TextField(
                     controller: deltaController,
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     autofocus: true,
                     decoration: InputDecoration(
-                      labelText: 'Quantity to ${isAddition ? 'Add' : 'Deduct'}',
+                      labelText: 'Quantity to ${isAddition ? 'Add' : 'Deduct'} (${product.isWeighted ? product.unit : 'pcs'})',
                       prefixIcon: Icon(isAddition ? Icons.add_circle_outline : Icons.remove_circle_outline),
                     ),
                   ),
@@ -342,7 +443,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     backgroundColor: isAddition ? AppTheme.primaryGreen : AppTheme.dangerRed,
                   ),
                   onPressed: () async {
-                    final qty = int.tryParse(deltaController.text.trim()) ?? 0;
+                    final qty = double.tryParse(deltaController.text.trim()) ?? 0;
                     if (qty <= 0) return;
 
                     final reason = reasonController.text.trim().isNotEmpty
@@ -664,13 +765,44 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      product.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            product.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (product.isBarcodeless) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              border: Border.all(color: Colors.amber.shade400),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('🏷️ Loose', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.brown)),
+                          ),
+                        ],
+                        if (product.isWeighted) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: Colors.indigo.shade50,
+                              border: Border.all(color: Colors.indigo.shade200),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text('⚖️ ${product.unit}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Barcode: ${product.barcodeString}',
+                      product.isBarcodeless ? 'PLU: ${product.barcodeString}' : 'Barcode: ${product.barcodeString}',
                       style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                     const SizedBox(height: 4),
@@ -697,7 +829,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      hasStock ? '${product.stock} in stock' : 'Untracked',
+                      hasStock ? '${product.formattedStock} in stock' : 'Untracked',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,

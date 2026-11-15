@@ -13,7 +13,8 @@ class CartProvider extends ChangeNotifier {
   List<CartItem> get items => List.unmodifiable(_items);
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  int get itemCount => _items.fold(0, (sum, i) => sum + i.quantity);
+  int get itemCount =>
+      _items.fold(0, (sum, i) => sum + (i.isWeighted ? 1 : i.quantity));
 
   int get totalCentavos =>
       _items.fold(0, (sum, item) => sum + item.lineTotalCentavos);
@@ -21,22 +22,48 @@ class CartProvider extends ChangeNotifier {
   double get totalPesos => totalCentavos / 100.0;
   String get formattedTotal => '₱${totalPesos.toStringAsFixed(2)}';
 
-  void addProduct(Product product) {
+  void addProduct(Product product, {double? weight}) {
     final existingIndex =
         _items.indexWhere((i) => i.product.id == product.id);
-    if (existingIndex >= 0) {
-      _items[existingIndex].quantity += 1;
+    if (product.isWeighted) {
+      final w = weight ?? 1.0;
+      if (existingIndex >= 0) {
+        final currentWeight = _items[existingIndex].weight ?? 0.0;
+        _items[existingIndex].weight = currentWeight + w;
+      } else {
+        _items.add(CartItem(product: product, quantity: 1, weight: w));
+      }
     } else {
-      _items.add(CartItem(product: product, quantity: 1));
+      if (existingIndex >= 0) {
+        _items[existingIndex].quantity += 1;
+      } else {
+        _items.add(CartItem(product: product, quantity: 1));
+      }
     }
     _errorMessage = null;
     notifyListeners();
   }
 
+  void updateWeight(int productId, double newWeight) {
+    final index = _items.indexWhere((i) => i.product.id == productId);
+    if (index >= 0) {
+      if (newWeight <= 0) {
+        _items.removeAt(index);
+      } else {
+        _items[index].weight = newWeight;
+      }
+      notifyListeners();
+    }
+  }
+
   void incrementQuantity(int productId) {
     final index = _items.indexWhere((i) => i.product.id == productId);
     if (index >= 0) {
-      _items[index].quantity += 1;
+      if (_items[index].isWeighted) {
+        _items[index].weight = (_items[index].weight ?? 1.0) + 0.25;
+      } else {
+        _items[index].quantity += 1;
+      }
       notifyListeners();
     }
   }
@@ -44,10 +71,19 @@ class CartProvider extends ChangeNotifier {
   void decrementQuantity(int productId) {
     final index = _items.indexWhere((i) => i.product.id == productId);
     if (index >= 0) {
-      if (_items[index].quantity > 1) {
-        _items[index].quantity -= 1;
+      if (_items[index].isWeighted) {
+        final current = _items[index].weight ?? 1.0;
+        if (current > 0.25) {
+          _items[index].weight = current - 0.25;
+        } else {
+          _items.removeAt(index);
+        }
       } else {
-        _items.removeAt(index);
+        if (_items[index].quantity > 1) {
+          _items[index].quantity -= 1;
+        } else {
+          _items.removeAt(index);
+        }
       }
       notifyListeners();
     }

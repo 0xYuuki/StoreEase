@@ -198,5 +198,83 @@ void main() {
       expect(fromJson.peakCentavos, 3000);
       expect(fromJson.averagePesos, 20.0);
     });
+
+    test('Barcodeless & Weighted Product Models and Cart Calculations', () {
+      final looseEgg = Product(
+        id: 101,
+        barcodeString: 'PLU-1001',
+        name: 'Native Egg',
+        priceCentavos: 800, // ₱8.00 / pc
+        stock: 50,
+        isBarcodeless: true,
+      );
+      expect(looseEgg.isBarcodeless, true);
+      expect(looseEgg.isWeighted, false);
+      expect(looseEgg.formattedPrice, '₱8.00');
+      expect(looseEgg.formattedStock, '50 pcs');
+
+      final weightedRice = Product(
+        id: 102,
+        barcodeString: 'PLU-1002',
+        name: 'Sinandomeng Rice',
+        priceCentavos: 5200, // ₱52.00 / kg
+        stock: 48.5,
+        pricingType: 'weight',
+        unit: 'kg',
+        isBarcodeless: true,
+      );
+      expect(weightedRice.isBarcodeless, true);
+      expect(weightedRice.isWeighted, true);
+      expect(weightedRice.formattedPrice, '₱52.00 / kg');
+      expect(weightedRice.formattedStock, '48.50 kg');
+
+      // Cart Calculations with Fractional Weights
+      final storage = StorageService();
+      final db = DatabaseService();
+      final api = ApiService(database: db, storage: storage);
+      final cart = CartProvider(api: api);
+
+      // Add 0.50 kg (kalahati) of Rice -> 0.50 * 52.00 = ₱26.00 (2600 centavos)
+      cart.addProduct(weightedRice, weight: 0.50);
+      expect(cart.items.length, 1);
+      expect(cart.totalCentavos, 2600);
+      expect(cart.formattedTotal, '₱26.00');
+      expect(cart.items.first.formattedQuantityOrWeight, '0.50 kg');
+
+      // Add 3 loose eggs -> 3 * 8.00 = ₱24.00 (2400 centavos)
+      cart.addProduct(looseEgg);
+      cart.addProduct(looseEgg);
+      cart.addProduct(looseEgg);
+      expect(cart.items.length, 2);
+      expect(cart.totalCentavos, 5000); // 2600 + 2400
+      expect(cart.formattedTotal, '₱50.00');
+
+      // Increment weight by 0.25 kg -> 0.75 kg * 52.00 = ₱39.00
+      cart.incrementQuantity(weightedRice.id);
+      expect(cart.items.first.weight, 0.75);
+      expect(cart.items.first.lineTotalCentavos, 3900);
+      expect(cart.totalCentavos, 6300); // 3900 + 2400
+
+      // Update weight directly to 1/4 kg (0.25 kg) -> 0.25 * 52.00 = ₱13.00
+      cart.updateWeight(weightedRice.id, 0.25);
+      expect(cart.items.first.weight, 0.25);
+      expect(cart.items.first.lineTotalCentavos, 1300);
+      expect(cart.totalCentavos, 3700); // 1300 + 2400
+
+      // SaleItem serialization
+      final saleItem = SaleItem(
+        productId: weightedRice.id,
+        productName: weightedRice.name,
+        barcodeString: weightedRice.barcodeString,
+        quantity: 1,
+        weight: 0.50,
+        unit: 'kg',
+        price: 5200,
+        lineTotal: 2600,
+      );
+      expect(saleItem.isWeighted, true);
+      expect(saleItem.formattedQuantityOrWeight, '0.50 kg');
+      expect(saleItem.lineTotalPesos, 26.0);
+    });
   });
 }

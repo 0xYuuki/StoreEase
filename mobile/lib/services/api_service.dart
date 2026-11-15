@@ -32,12 +32,15 @@ class ApiService {
 
   // Products
   Future<Product> createProduct({
-    required String barcodeString,
+    String? barcodeString,
     required String name,
     required int priceCentavos,
-    int? initialStock,
-    int? reorderLevel,
+    num? initialStock,
+    num? reorderLevel,
     String category = 'General',
+    String pricingType = 'unit',
+    String unit = 'pc',
+    bool isBarcodeless = false,
   }) async {
     return await database.createProduct(
       barcodeString: barcodeString,
@@ -46,6 +49,9 @@ class ApiService {
       initialStock: initialStock,
       reorderLevel: reorderLevel,
       category: category,
+      pricingType: pricingType,
+      unit: unit,
+      isBarcodeless: isBarcodeless,
     );
   }
 
@@ -58,7 +64,7 @@ class ApiService {
   }
 
   // Stock Adjustment
-  Future<Product> adjustStock(int productId, int delta, String reason) async {
+  Future<Product> adjustStock(int productId, num delta, String reason) async {
     return await database.adjustStock(productId, delta, reason);
   }
 

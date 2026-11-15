@@ -46,10 +46,27 @@ class DatabaseService {
       },
     );
 
-    // Auto-migrate schema: ensure category column exists on Products
+    // Auto-migrate schema: ensure new columns exist on Products & SaleItems
     final productCols = await _db!.rawQuery('PRAGMA table_info(Products)');
     if (!productCols.any((c) => c['name'] == 'category')) {
       await _db!.execute("ALTER TABLE Products ADD COLUMN category TEXT NOT NULL DEFAULT 'General'");
+    }
+    if (!productCols.any((c) => c['name'] == 'pricing_type')) {
+      await _db!.execute("ALTER TABLE Products ADD COLUMN pricing_type TEXT NOT NULL DEFAULT 'unit'");
+    }
+    if (!productCols.any((c) => c['name'] == 'unit')) {
+      await _db!.execute("ALTER TABLE Products ADD COLUMN unit TEXT NOT NULL DEFAULT 'pc'");
+    }
+    if (!productCols.any((c) => c['name'] == 'is_barcodeless')) {
+      await _db!.execute("ALTER TABLE Products ADD COLUMN is_barcodeless INTEGER NOT NULL DEFAULT 0");
+    }
+
+    final saleItemCols = await _db!.rawQuery('PRAGMA table_info(SaleItems)');
+    if (!saleItemCols.any((c) => c['name'] == 'weight')) {
+      await _db!.execute("ALTER TABLE SaleItems ADD COLUMN weight REAL");
+    }
+    if (!saleItemCols.any((c) => c['name'] == 'unit')) {
+      await _db!.execute("ALTER TABLE SaleItems ADD COLUMN unit TEXT");
     }
   }
 
@@ -61,9 +78,12 @@ class DatabaseService {
         name TEXT NOT NULL,
         price INTEGER NOT NULL,
         active INTEGER NOT NULL DEFAULT 1,
-        stock INTEGER,
-        reorder_level INTEGER,
-        category TEXT NOT NULL DEFAULT 'General'
+        stock REAL,
+        reorder_level REAL,
+        category TEXT NOT NULL DEFAULT 'General',
+        pricing_type TEXT NOT NULL DEFAULT 'unit',
+        unit TEXT NOT NULL DEFAULT 'pc',
+        is_barcodeless INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -84,6 +104,8 @@ class DatabaseService {
         sale_id INTEGER NOT NULL REFERENCES Sales(id) ON DELETE RESTRICT,
         product_id INTEGER REFERENCES Products(id) ON DELETE RESTRICT,
         quantity INTEGER NOT NULL,
+        weight REAL,
+        unit TEXT,
         price INTEGER NOT NULL,
         product_name TEXT NOT NULL,
         barcode_string TEXT NOT NULL,
@@ -193,20 +215,48 @@ class DatabaseService {
 
   // --- PRODUCTS ---
 
+  Future<String> generateNextPluBarcode() async {
+    final rows = await db.rawQuery(
+      "SELECT barcode_string FROM Products WHERE barcode_string LIKE 'PLU-%' ORDER BY id DESC LIMIT 1",
+    );
+    if (rows.isNotEmpty) {
+      final lastCode = rows.first['barcode_string'] as String;
+      final match = RegExp(r'PLU-(\d+)').firstMatch(lastCode);
+      if (match != null) {
+        final val = int.tryParse(match.group(1)!) ?? 1000;
+        return 'PLU-${val + 1}';
+      }
+    }
+    final countRows = await db.rawQuery("SELECT COUNT(*) as cnt FROM Products");
+    final count = (countRows.first['cnt'] as int? ?? 0) + 1001;
+    return 'PLU-$count';
+  }
+
   Future<Product> createProduct({
-    required String barcodeString,
+    String? barcodeString,
     required String name,
     required int priceCentavos,
-    int? initialStock,
-    int? reorderLevel,
+    num? initialStock,
+    num? reorderLevel,
     String category = 'General',
+    String pricingType = 'unit',
+    String unit = 'pc',
+    bool isBarcodeless = false,
   }) async {
-    final cleanBarcode = barcodeString.trim();
     final cleanName = name.trim();
     final cleanCategory = category.trim().isEmpty ? 'General' : category.trim();
-    if (cleanBarcode.isEmpty) throw Exception('Barcode cannot be empty');
+    final cleanPricingType = pricingType.trim().isEmpty ? 'unit' : pricingType.trim();
+    final cleanUnit = unit.trim().isEmpty ? (cleanPricingType == 'weight' ? 'kg' : 'pc') : unit.trim();
     if (cleanName.isEmpty) throw Exception('Product name cannot be empty');
     if (priceCentavos < 0) throw Exception('Price cannot be negative');
+
+    String cleanBarcode = (barcodeString ?? '').trim();
+    if (cleanBarcode.isEmpty || isBarcodeless) {
+      isBarcodeless = true;
+      if (cleanBarcode.isEmpty) {
+        cleanBarcode = await generateNextPluBarcode();
+      }
+    }
 
     return await db.transaction<Product>((txn) async {
       final existing = await txn.query(
@@ -226,6 +276,9 @@ class DatabaseService {
         'reorder_level': reorderLevel,
         'active': 1,
         'category': cleanCategory,
+        'pricing_type': cleanPricingType,
+        'unit': cleanUnit,
+        'is_barcodeless': isBarcodeless ? 1 : 0,
       });
 
       if (initialStock != null && initialStock > 0) {
@@ -248,6 +301,9 @@ class DatabaseService {
         reorderLevel: reorderLevel,
         active: 1,
         category: cleanCategory,
+        pricingType: cleanPricingType,
+        unit: cleanUnit,
+        isBarcodeless: isBarcodeless,
       );
     });
   }
@@ -275,7 +331,7 @@ class DatabaseService {
     return Product.fromJson(rows.first);
   }
 
-  Future<Product> adjustStock(int productId, int delta, String reason) async {
+  Future<Product> adjustStock(int productId, num delta, String reason) async {
     return await db.transaction<Product>((txn) async {
       final rows = await txn.query(
         'Products',
@@ -359,7 +415,7 @@ class DatabaseService {
       // 1. Calculate total and verify stock availability
       int totalCentavos = 0;
       for (final item in items) {
-        final lineTotal = item.product.priceCentavos * item.quantity;
+        final lineTotal = item.lineTotalCentavos;
         totalCentavos += lineTotal;
 
         if (item.product.stock != null) {
@@ -369,9 +425,16 @@ class DatabaseService {
             whereArgs: [item.product.id],
           );
           if (pRows.isNotEmpty) {
-            final currentStock = pRows.first['stock'] as int?;
-            if (currentStock != null && currentStock < item.quantity) {
-              throw Exception('Insufficient stock for ${item.product.name} (Available: $currentStock, Required: ${item.quantity})');
+            final currentStock = (pRows.first['stock'] as num?)?.toDouble();
+            final requiredQty = item.isWeighted ? (item.weight ?? 1.0) : item.quantity.toDouble();
+            if (currentStock != null && currentStock < requiredQty) {
+              final formattedReq = item.isWeighted
+                  ? '${requiredQty.toStringAsFixed(2)} ${item.product.unit}'
+                  : '${item.quantity} pcs';
+              final formattedAvail = item.isWeighted
+                  ? '${currentStock.toStringAsFixed(2)} ${item.product.unit}'
+                  : '${currentStock.toInt()} pcs';
+              throw Exception('Insufficient stock for ${item.product.name} (Available: $formattedAvail, Required: $formattedReq)');
             }
           }
         }
@@ -438,11 +501,16 @@ class DatabaseService {
       // 4. Insert SaleItems & update inventory stock
       final receiptItems = <SaleItem>[];
       for (final item in items) {
-        final lineTotal = item.product.priceCentavos * item.quantity;
+        final lineTotal = item.lineTotalCentavos;
+        final itemWeight = item.isWeighted ? (item.weight ?? 1.0) : null;
+        final itemUnit = item.isWeighted ? item.product.unit : 'pc';
+
         await txn.insert('SaleItems', {
           'sale_id': saleId,
           'product_id': item.product.id,
           'quantity': item.quantity,
+          'weight': itemWeight,
+          'unit': itemUnit,
           'price': item.product.priceCentavos,
           'product_name': item.product.name,
           'barcode_string': item.product.barcodeString,
@@ -455,26 +523,29 @@ class DatabaseService {
           productName: item.product.name,
           barcodeString: item.product.barcodeString,
           quantity: item.quantity,
+          weight: itemWeight,
+          unit: itemUnit,
           price: item.product.priceCentavos,
           lineTotal: lineTotal,
         ));
 
         if (item.product.stock != null) {
           final pRows = await txn.query('Products', where: 'id = ?', whereArgs: [item.product.id]);
-          final currentStock = (pRows.first['stock'] as int?) ?? 0;
-          final newStock = currentStock - item.quantity;
+          final currentStock = (pRows.first['stock'] as num?)?.toDouble() ?? 0.0;
+          final deductAmount = item.isWeighted ? (item.weight ?? 1.0) : item.quantity.toDouble();
+          final newStock = currentStock - deductAmount;
 
           await txn.update(
             'Products',
-            {'stock': newStock},
+            {'stock': item.isWeighted ? newStock : newStock.round()},
             where: 'id = ?',
             whereArgs: [item.product.id],
           );
 
           await txn.insert('StockAdjustments', {
             'product_id': item.product.id,
-            'delta': -item.quantity,
-            'resulting_stock': newStock,
+            'delta': item.isWeighted ? -deductAmount : -item.quantity,
+            'resulting_stock': item.isWeighted ? newStock : newStock.round(),
             'reason': 'Sale #$saleId',
             'timestamp': now,
             'sale_id': saleId,
@@ -771,6 +842,8 @@ class DatabaseService {
       productName: i['product_name'] as String,
       barcodeString: i['barcode_string'] as String,
       quantity: i['quantity'] as int,
+      weight: (i['weight'] as num?)?.toDouble(),
+      unit: i['unit'] as String?,
       price: i['price'] as int,
       lineTotal: i['line_total'] as int,
     )).toList();

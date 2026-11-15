@@ -24,6 +24,7 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _tenderedController = TextEditingController();
   bool _showScanner = false;
+  String _posFilter = 'all'; // 'all', 'loose', 'weight'
 
   // Barcode scan throttling & interval control
   DateTime? _lastScanTime;
@@ -91,6 +92,58 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
     _onBarcodeScanned(clean);
   }
 
+  Future<void> _addProductToCart(Product product) async {
+    final cart = context.read<CartProvider>();
+    if (product.isWeighted) {
+      final selectedWeight = await AppDialogs.showWeightEntryDialog(
+        context: context,
+        product: product,
+      );
+      if (selectedWeight != null && selectedWeight > 0) {
+        cart.addProduct(product, weight: selectedWeight);
+        await AudioService.playScanBeep();
+        if (mounted) {
+          final wStr = selectedWeight % 1 == 0 ? selectedWeight.toInt().toString() : selectedWeight.toStringAsFixed(2);
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Added $wStr ${product.unit} of ${product.name} to cart'),
+                  ),
+                ],
+              ),
+              backgroundColor: AppTheme.primaryDark,
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      }
+    } else {
+      cart.addProduct(product);
+      await AudioService.playScanBeep();
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Added: ${product.name} (+1 in cart)')),
+              ],
+            ),
+            backgroundColor: AppTheme.primaryDark,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _onBarcodeScanned(String clean) async {
     final productProv = context.read<ProductProvider>();
     final product = await productProv.lookupBarcode(clean);
@@ -98,11 +151,6 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
     if (!mounted) return;
 
     if (product != null) {
-      context.read<CartProvider>().addProduct(product);
-
-      // Play retail scanner beep audio + haptic vibration + system click
-      await AudioService.playScanBeep();
-
       if (mounted) {
         setState(() {
           _isScanCooldown = true;
@@ -116,22 +164,9 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
             });
           }
         });
-
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Scanned: ${product.name} (+1 in cart)')),
-              ],
-            ),
-            backgroundColor: AppTheme.primaryDark,
-            duration: const Duration(seconds: 1),
-          ),
-        );
       }
+
+      await _addProductToCart(product);
     } else {
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -237,13 +272,16 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
     final allProducts = productProv.products;
 
     final query = _searchController.text.trim().toLowerCase();
-    final filteredProducts = query.isEmpty
-        ? <Product>[]
-        : allProducts.where((p) {
-            final name = p.name.trim().toLowerCase();
-            final barcode = p.barcodeString.trim().toLowerCase();
-            return name.startsWith(query) || barcode.startsWith(query);
-          }).toList();
+    final filteredProducts = allProducts.where((p) {
+      if (_posFilter == 'loose' && !p.isBarcodeless) return false;
+      if (_posFilter == 'weight' && !p.isWeighted) return false;
+      if (query.isNotEmpty) {
+        final name = p.name.trim().toLowerCase();
+        final barcode = p.barcodeString.trim().toLowerCase();
+        return name.startsWith(query) || barcode.startsWith(query);
+      }
+      return _posFilter != 'all';
+    }).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -283,7 +321,7 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
           // Camera Barcode Scanner View (collapsible)
           if (_showScanner && widget.isActive)
             Container(
-              height: 200,
+              height: 170,
               color: Colors.black,
               child: Stack(
                 alignment: Alignment.center,
@@ -336,7 +374,7 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
 
           // Search Bar
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -356,8 +394,45 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
             ),
           ),
 
+          // Quick Filter Chips (All, Loose Items, By Weight)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: const Text('All Items'),
+                  selected: _posFilter == 'all',
+                  onSelected: (val) {
+                    if (val) setState(() => _posFilter = 'all');
+                  },
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  avatar: const Text('🏷️', style: TextStyle(fontSize: 12)),
+                  label: const Text('Loose Items (No Barcode)'),
+                  selected: _posFilter == 'loose',
+                  selectedColor: AppTheme.primaryLight,
+                  onSelected: (val) {
+                    setState(() => _posFilter = val ? 'loose' : 'all');
+                  },
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  avatar: const Text('⚖️', style: TextStyle(fontSize: 12)),
+                  label: const Text('By Weight (Timbang)'),
+                  selected: _posFilter == 'weight',
+                  selectedColor: AppTheme.primaryLight,
+                  onSelected: (val) {
+                    setState(() => _posFilter = val ? 'weight' : 'all');
+                  },
+                ),
+              ],
+            ),
+          ),
+
           // Vertical Search Preview List (Up/Down)
-          if (_searchController.text.isNotEmpty)
+          if (_searchController.text.isNotEmpty || _posFilter != 'all')
             Container(
               constraints: const BoxConstraints(maxHeight: 220),
               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -378,7 +453,9 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
                             Icon(Icons.search_off, size: 20, color: Colors.grey.shade400),
                             const SizedBox(width: 8),
                             Text(
-                              'No products starting with "${_searchController.text}"',
+                              _searchController.text.isNotEmpty
+                                  ? 'No products starting with "${_searchController.text}"'
+                                  : 'No products in this filter',
                               style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
                             ),
                           ],
@@ -395,12 +472,56 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
                             dense: true,
                             leading: CircleAvatar(
                               radius: 16,
-                              backgroundColor: AppTheme.primaryLight,
-                              child: const Icon(Icons.inventory_2_outlined, size: 16, color: AppTheme.primaryGreen),
+                              backgroundColor: p.isWeighted
+                                  ? Colors.indigo.shade50
+                                  : (p.isBarcodeless ? Colors.amber.shade50 : AppTheme.primaryLight),
+                              child: Icon(
+                                p.isWeighted
+                                    ? Icons.scale_outlined
+                                    : (p.isBarcodeless ? Icons.label_outline : Icons.inventory_2_outlined),
+                                size: 16,
+                                color: p.isWeighted
+                                    ? Colors.indigo
+                                    : (p.isBarcodeless ? Colors.brown : AppTheme.primaryGreen),
+                              ),
                             ),
-                            title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    p.name,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (p.isBarcodeless) ...[
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade50,
+                                      border: Border.all(color: Colors.amber.shade300),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('🏷️ Loose', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.brown)),
+                                  ),
+                                ],
+                                if (p.isWeighted) ...[
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.indigo.shade50,
+                                      border: Border.all(color: Colors.indigo.shade200),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text('⚖️ ${p.unit}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                                  ),
+                                ],
+                              ],
+                            ),
                             subtitle: Text(
-                              'Barcode: ${p.barcodeString}${p.stock != null ? ' • Stock: ${p.stock}' : ''}',
+                              '${p.isBarcodeless ? 'PLU: ' : 'Barcode: '}${p.barcodeString}${p.stock != null ? ' • Stock: ${p.formattedStock}' : ''}',
                               style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                             ),
                             trailing: Row(
@@ -409,19 +530,13 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
                                 Text(p.formattedPrice, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryDark)),
                                 const SizedBox(width: 6),
                                 IconButton(
-                                  icon: const Icon(Icons.add_circle, color: AppTheme.primaryGreen, size: 24),
-                                  tooltip: 'Add to Cart',
-                                  onPressed: () {
-                                    AudioService.playScanBeep();
-                                    cart.addProduct(p);
-                                  },
+                                  icon: Icon(p.isWeighted ? Icons.scale_outlined : Icons.add_circle, color: AppTheme.primaryGreen, size: 24),
+                                  tooltip: p.isWeighted ? 'Weigh Item' : 'Add to Cart',
+                                  onPressed: () => _addProductToCart(p),
                                 ),
                               ],
                             ),
-                            onTap: () {
-                              AudioService.playScanBeep();
-                              cart.addProduct(p);
-                            },
+                            onTap: () => _addProductToCart(p),
                           );
                         },
                       ),
@@ -467,13 +582,37 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      item.product.name,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            item.product.name,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (item.isWeighted) ...[
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: Colors.indigo.shade50,
+                                              border: Border.all(color: Colors.indigo.shade200),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '⚖️ ${item.formattedQuantityOrWeight}',
+                                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.indigo),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '${item.product.formattedPrice} each',
+                                      item.isWeighted
+                                          ? '${item.product.formattedPrice} • ${item.formattedQuantityOrWeight}'
+                                          : '${item.product.formattedPrice} each',
                                       style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                                     ),
                                   ],
@@ -484,15 +623,51 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
                                   IconButton(
                                     icon: const Icon(Icons.remove_circle_outline, size: 22),
                                     color: AppTheme.textMuted,
+                                    tooltip: item.isWeighted ? 'Less 1/4 kg' : 'Decrease',
                                     onPressed: () => cart.decrementQuantity(item.product.id),
                                   ),
-                                  Text(
-                                    '${item.quantity}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
+                                  if (item.isWeighted)
+                                    InkWell(
+                                      onTap: () async {
+                                        final newWeight = await AppDialogs.showWeightEntryDialog(
+                                          context: context,
+                                          product: item.product,
+                                          initialWeight: item.weight,
+                                        );
+                                        if (newWeight != null && newWeight > 0) {
+                                          cart.updateWeight(item.product.id, newWeight);
+                                        }
+                                      },
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primaryLight,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: AppTheme.accentGreen),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              item.formattedQuantityOrWeight,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryDark),
+                                            ),
+                                            const SizedBox(width: 2),
+                                            const Icon(Icons.edit, size: 12, color: AppTheme.primaryDark),
+                                          ],
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      '${item.quantity}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
                                   IconButton(
                                     icon: const Icon(Icons.add_circle_outline, size: 22),
                                     color: AppTheme.primaryGreen,
+                                    tooltip: item.isWeighted ? 'Add 1/4 kg' : 'Increase',
                                     onPressed: () => cart.incrementQuantity(item.product.id),
                                   ),
                                 ],

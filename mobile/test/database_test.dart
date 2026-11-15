@@ -438,5 +438,66 @@ void main() {
       expect(debtors.any((d) => d.name == 'Temporary Customer'), false);
       expect(debtors.any((d) => d.name == 'Aling Nena'), true);
     });
+
+    test('Creates barcodeless product with auto PLU and processes weighted product checkout with stock reduction', () async {
+      // 1. Create product without barcode -> auto PLU
+      final eggLoose = await dbService.createProduct(
+        name: 'Native Fresh Egg',
+        priceCentavos: 800, // ₱8.00
+        initialStock: 30,
+        isBarcodeless: true,
+      );
+      expect(eggLoose.isBarcodeless, true);
+      expect(eggLoose.barcodeString.startsWith('PLU-'), true);
+
+      // 2. Create weighted product (Sinandomeng Rice @ ₱52.00 / kg with 50.0 kg initial stock)
+      final rice = await dbService.createProduct(
+        name: 'Sinandomeng Rice',
+        priceCentavos: 5200, // ₱52.00 / kg
+        initialStock: 50.0,
+        pricingType: 'weight',
+        unit: 'kg',
+        isBarcodeless: true,
+      );
+      expect(rice.isWeighted, true);
+      expect(rice.unit, 'kg');
+      expect(rice.stock, 50.0);
+
+      // 3. Checkout with 0.50 kg of Rice (₱26.00) and 2 Loose Eggs (₱16.00) -> Total = ₱42.00 (4200 centavos)
+      final receipt = await dbService.checkout(
+        items: [
+          CartItem(product: rice, quantity: 1, weight: 0.50),
+          CartItem(product: eggLoose, quantity: 2),
+        ],
+        tenderedAmount: 5000, // ₱50.00 cash
+      );
+
+      expect(receipt.totalAmount, 4200);
+      expect(receipt.tenderedAmount, 5000);
+      expect(receipt.changeAmount, 800); // ₱8.00 change
+      expect(receipt.items.length, 2);
+
+      // Verify rice item in receipt has weight and unit
+      final receiptRice = receipt.items.firstWhere((i) => i.productId == rice.id);
+      expect(receiptRice.isWeighted, true);
+      expect(receiptRice.weight, 0.50);
+      expect(receiptRice.unit, 'kg');
+      expect(receiptRice.lineTotal, 2600);
+
+      // 4. Verify stock decremented accurately: 50.0 - 0.50 = 49.50 kg
+      final updatedRice = (await dbService.getProducts()).firstWhere((p) => p.id == rice.id);
+      expect(updatedRice.stock, 49.50);
+
+      // Verify eggs decremented: 30 - 2 = 28 pcs
+      final updatedEgg = (await dbService.getProducts()).firstWhere((p) => p.id == eggLoose.id);
+      expect(updatedEgg.stock, 28);
+
+      // 5. Verify receipt retrieval preserves weights
+      final fetchedReceipt = await dbService.getReceipt(receipt.saleId);
+      final fetchedRice = fetchedReceipt.items.firstWhere((i) => i.productId == rice.id);
+      expect(fetchedRice.weight, 0.50);
+      expect(fetchedRice.unit, 'kg');
+      expect(fetchedRice.lineTotal, 2600);
+    });
   });
 }

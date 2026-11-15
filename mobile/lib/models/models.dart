@@ -3,10 +3,13 @@ class Product {
   final String barcodeString;
   final String name;
   final int priceCentavos;
-  final int? stock;
-  final int? reorderLevel;
+  final num? stock;
+  final num? reorderLevel;
   final int active;
   final String category;
+  final String pricingType; // 'unit' or 'weight'
+  final String unit; // 'pc', 'kg', 'g'
+  final bool isBarcodeless;
 
   Product({
     required this.id,
@@ -17,10 +20,26 @@ class Product {
     this.reorderLevel,
     this.active = 1,
     this.category = 'General',
+    this.pricingType = 'unit',
+    this.unit = 'pc',
+    this.isBarcodeless = false,
   });
 
+  bool get isWeighted => pricingType == 'weight';
+
   double get pricePesos => priceCentavos / 100.0;
-  String get formattedPrice => '₱${pricePesos.toStringAsFixed(2)}';
+  String get formattedPrice =>
+      isWeighted ? '₱${pricePesos.toStringAsFixed(2)} / $unit' : '₱${pricePesos.toStringAsFixed(2)}';
+
+  String get formattedStock {
+    if (stock == null) return 'Untracked';
+    if (isWeighted) {
+      final s = stock!.toDouble();
+      final str = s % 1 == 0 ? s.toInt().toString() : s.toStringAsFixed(2);
+      return '$str $unit';
+    }
+    return '${stock!.toInt()} pcs';
+  }
 
   bool get isLowStock =>
       stock != null && reorderLevel != null && stock! <= reorderLevel!;
@@ -31,10 +50,13 @@ class Product {
       barcodeString: json['barcode_string'] as String,
       name: json['name'] as String,
       priceCentavos: json['price'] as int,
-      stock: json['stock'] as int?,
-      reorderLevel: json['reorder_level'] as int?,
+      stock: json['stock'] as num?,
+      reorderLevel: json['reorder_level'] as num?,
       active: (json['active'] as int?) ?? 1,
       category: (json['category'] as String?) ?? 'General',
+      pricingType: (json['pricing_type'] as String?) ?? 'unit',
+      unit: (json['unit'] as String?) ?? ((json['pricing_type'] == 'weight') ? 'kg' : 'pc'),
+      isBarcodeless: (json['is_barcodeless'] == 1 || json['is_barcodeless'] == true),
     );
   }
 
@@ -48,6 +70,9 @@ class Product {
       'reorder_level': reorderLevel,
       'active': active,
       'category': category,
+      'pricing_type': pricingType,
+      'unit': unit,
+      'is_barcodeless': isBarcodeless ? 1 : 0,
     };
   }
 }
@@ -55,15 +80,34 @@ class Product {
 class CartItem {
   final Product product;
   int quantity;
+  double? weight; // in kg or unit specified by product
 
   CartItem({
     required this.product,
     this.quantity = 1,
+    this.weight,
   });
 
-  int get lineTotalCentavos => product.priceCentavos * quantity;
+  bool get isWeighted => product.isWeighted || (weight != null && weight! > 0);
+
+  int get lineTotalCentavos {
+    if (isWeighted) {
+      return (product.priceCentavos * (weight ?? 1.0)).round();
+    }
+    return product.priceCentavos * quantity;
+  }
+
   double get lineTotalPesos => lineTotalCentavos / 100.0;
   String get formattedLineTotal => '₱${lineTotalPesos.toStringAsFixed(2)}';
+
+  String get formattedQuantityOrWeight {
+    if (isWeighted) {
+      final w = weight ?? 1.0;
+      final str = w % 1 == 0 ? w.toInt().toString() : w.toStringAsFixed(2);
+      return '$str ${product.unit}';
+    }
+    return '$quantity pcs';
+  }
 }
 
 class Debtor {
@@ -144,8 +188,8 @@ class DebtTransaction {
 
 class StockMovement {
   final int id;
-  final int delta;
-  final int resultingStock;
+  final num delta;
+  final num resultingStock;
   final String reason;
   final int? saleId;
   final String timestamp;
@@ -162,8 +206,8 @@ class StockMovement {
   factory StockMovement.fromJson(Map<String, dynamic> json) {
     return StockMovement(
       id: json['id'] as int,
-      delta: json['delta'] as int,
-      resultingStock: json['resulting_stock'] as int,
+      delta: (json['delta'] as num?) ?? 0,
+      resultingStock: (json['resulting_stock'] as num?) ?? 0,
       reason: json['reason'] as String? ?? '',
       saleId: json['sale_id'] as int?,
       timestamp: json['timestamp'] as String? ?? '',
@@ -176,6 +220,8 @@ class SaleItem {
   final String productName;
   final String barcodeString;
   final int quantity;
+  final double? weight;
+  final String? unit;
   final int price; // centavos
   final int lineTotal; // centavos
 
@@ -184,12 +230,25 @@ class SaleItem {
     required this.productName,
     required this.barcodeString,
     required this.quantity,
+    this.weight,
+    this.unit,
     required this.price,
     required this.lineTotal,
   });
 
+  bool get isWeighted => weight != null && weight! > 0;
+
   double get pricePesos => price / 100.0;
   double get lineTotalPesos => lineTotal / 100.0;
+
+  String get formattedQuantityOrWeight {
+    if (isWeighted) {
+      final w = weight!;
+      final str = w % 1 == 0 ? w.toInt().toString() : w.toStringAsFixed(2);
+      return '$str ${unit ?? 'kg'}';
+    }
+    return '$quantity pcs';
+  }
 
   factory SaleItem.fromJson(Map<String, dynamic> json) {
     return SaleItem(
@@ -197,9 +256,24 @@ class SaleItem {
       productName: json['product_name'] as String,
       barcodeString: json['barcode_string'] as String,
       quantity: json['quantity'] as int,
+      weight: (json['weight'] as num?)?.toDouble(),
+      unit: json['unit'] as String?,
       price: json['price'] as int,
       lineTotal: json['line_total'] as int,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'product_id': productId,
+      'product_name': productName,
+      'barcode_string': barcodeString,
+      'quantity': quantity,
+      'weight': weight,
+      'unit': unit,
+      'price': price,
+      'line_total': lineTotal,
+    };
   }
 }
 
