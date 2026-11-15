@@ -31,54 +31,138 @@ class _DebtsScreenState extends State<DebtsScreen> {
 
   Future<void> _showAddCustomerDialog() async {
     final nameController = TextEditingController();
-    final result = await showDialog<String>(
+    final debtController = TextEditingController();
+    final notesController = TextEditingController();
+    final phoneController = TextEditingController();
+
+    final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Add New Customer', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: TextField(
-            controller: nameController,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Customer Full Name',
-              hintText: 'e.g. Juan Dela Cruz',
-              prefixIcon: Icon(Icons.person_add),
+          title: Row(
+            children: const [
+              Icon(Icons.person_add_alt_1, color: AppTheme.primaryGreen),
+              SizedBox(width: 8),
+              Text('Add New Debtor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Customer Full Name *',
+                    hintText: 'e.g. Aling Nena, Juan Dela Cruz',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: debtController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Money Borrowed / Initial Debt (₱)',
+                    hintText: '0.00',
+                    helperText: 'Enter amount borrowed or leave 0.00',
+                    prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: notesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes / Reason (Optional)',
+                    hintText: 'e.g. Suki, borrowed for groceries',
+                    prefixIcon: Icon(Icons.notes_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number (Optional)',
+                    hintText: 'e.g. 09123456789',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                ),
+              ],
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(null),
+              onPressed: () => Navigator.of(ctx).pop(false),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
+              onPressed: () async {
                 final name = nameController.text.trim();
-                if (name.isNotEmpty) {
-                  Navigator.of(ctx).pop(name);
+                if (name.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter customer name'), backgroundColor: AppTheme.dangerRed),
+                  );
+                  return;
+                }
+
+                final debtText = debtController.text.trim();
+                double debtPesos = 0.0;
+                if (debtText.isNotEmpty) {
+                  debtPesos = double.tryParse(debtText) ?? -1;
+                  if (debtPesos < 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Debt amount must be 0 or positive'), backgroundColor: AppTheme.dangerRed),
+                    );
+                    return;
+                  }
+                }
+
+                final initialCentavos = (debtPesos * 100).round();
+                final notes = notesController.text.trim();
+                final phone = phoneController.text.trim();
+
+                final messenger = ScaffoldMessenger.of(context);
+                final debtProvider = context.read<DebtProvider>();
+                final nav = Navigator.of(ctx);
+
+                try {
+                  await debtProvider.createDebtor(
+                    name,
+                    initialDebtCentavos: initialCentavos,
+                    notes: notes.isNotEmpty ? notes : null,
+                    phone: phone.isNotEmpty ? phone : null,
+                  );
+                  nav.pop(true);
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Failed to add debtor: $e'), backgroundColor: AppTheme.dangerRed),
+                  );
                 }
               },
-              child: const Text('Save Customer'),
+              child: const Text('Save Debtor', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
       },
     );
 
-    if (result != null && mounted) {
-      final messenger = ScaffoldMessenger.of(context);
-      final debtProvider = context.read<DebtProvider>();
-      try {
-        await debtProvider.createDebtor(result);
-        if (!mounted) return;
-        messenger.showSnackBar(
-          SnackBar(content: Text('Customer "$result" created successfully')),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        messenger.showSnackBar(
-          SnackBar(content: Text('Failed to create customer: $e'), backgroundColor: AppTheme.dangerRed),
-        );
-      }
+    if (saved == true && mounted) {
+      final debtText = debtController.text.trim();
+      final hasDebt = (double.tryParse(debtText) ?? 0) > 0;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            hasDebt
+                ? 'Debtor "${nameController.text.trim()}" added with ₱$debtText initial debt!'
+                : 'Customer "${nameController.text.trim()}" added successfully!',
+          ),
+        ),
+      );
     }
   }
 

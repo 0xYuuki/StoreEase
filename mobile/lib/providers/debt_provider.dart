@@ -75,9 +75,19 @@ class DebtProvider extends ChangeNotifier {
     }
   }
 
-  Future<Debtor?> createDebtor(String name) async {
+  Future<Debtor?> createDebtor(
+    String name, {
+    int initialDebtCentavos = 0,
+    String? phone,
+    String? notes,
+  }) async {
     try {
-      final newDebtor = await api.createDebtor(name);
+      final newDebtor = await api.createDebtor(
+        name,
+        initialDebtCentavos: initialDebtCentavos,
+        phone: phone,
+        notes: notes,
+      );
       await loadDebts();
       return newDebtor;
     } catch (e) {

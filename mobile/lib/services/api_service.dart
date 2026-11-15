@@ -91,8 +91,18 @@ class ApiService {
     return await database.getDebtors();
   }
 
-  Future<Debtor> createDebtor(String name) async {
-    return await database.createDebtor(name);
+  Future<Debtor> createDebtor(
+    String name, {
+    int initialDebtCentavos = 0,
+    String? phone,
+    String? notes,
+  }) async {
+    return await database.createDebtor(
+      name,
+      initialDebtCentavos: initialDebtCentavos,
+      phone: phone,
+      notes: notes,
+    );
   }
 
   Future<List<DebtTransaction>> getCustomerTransactions(int customerId) async {

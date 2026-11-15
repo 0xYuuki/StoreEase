@@ -182,6 +182,32 @@ void main() {
       expect(kanor.activeDebt, true);
     });
 
+    test('Creates customer directly with initial borrowed debt and logs transaction', () async {
+      final debtor = await dbService.createDebtor(
+        'Mang Juan',
+        initialDebtCentavos: 15000,
+        phone: '09123456780',
+        notes: 'Borrowed for groceries',
+      );
+
+      expect(debtor.id > 0, true);
+      expect(debtor.name, 'Mang Juan');
+      expect(debtor.currentBalance, 15000);
+      expect(debtor.balancePesos, 150.0);
+      expect(debtor.activeDebt, true);
+
+      final debtors = await dbService.getDebtors();
+      final juan = debtors.firstWhere((d) => d.name == 'Mang Juan');
+      expect(juan.currentBalance, 15000);
+
+      final txs = await dbService.getCustomerTransactions(debtor.id);
+      expect(txs.isNotEmpty, true);
+      expect(txs.first.type, 'debt');
+      expect(txs.first.amount, 15000);
+      expect(txs.first.resultingBalance, 15000);
+      expect(txs.first.notes, 'Initial borrowed balance: Borrowed for groceries');
+    });
+
     test('Records customer payment and reduces debt balance', () async {
       final debtors = await dbService.getDebtors();
       final alingNena = debtors.firstWhere((d) => d.name == 'Aling Nena');

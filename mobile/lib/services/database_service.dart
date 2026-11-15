@@ -560,29 +560,54 @@ class DatabaseService {
     }).toList();
   }
 
-  Future<Debtor> createDebtor(String name, {String? phone, String? notes}) async {
+  Future<Debtor> createDebtor(
+    String name, {
+    int initialDebtCentavos = 0,
+    String? phone,
+    String? notes,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) throw Exception('Customer name cannot be empty');
+    if (initialDebtCentavos < 0) throw Exception('Initial debt cannot be negative');
 
     final now = DateTime.now().toIso8601String();
-    final id = await db.insert('Customers', {
-      'name': trimmed,
-      'phone': phone?.trim(),
-      'notes': notes?.trim(),
-      'balance': 0,
-      'active': 1,
-      'created_at': now,
-      'updated_at': now,
-    });
 
-    return Debtor(
-      id: id,
-      name: trimmed,
-      currentBalance: 0,
-      activeDebt: false,
-      createdAt: now,
-      updatedAt: now,
-    );
+    return await db.transaction<Debtor>((txn) async {
+      final id = await txn.insert('Customers', {
+        'name': trimmed,
+        'phone': phone?.trim(),
+        'notes': notes?.trim(),
+        'balance': initialDebtCentavos,
+        'active': 1,
+        'created_at': now,
+        'updated_at': now,
+      });
+
+      if (initialDebtCentavos > 0) {
+        final note = (notes != null && notes.trim().isNotEmpty)
+            ? 'Initial borrowed balance: ${notes.trim()}'
+            : 'Initial borrowed balance';
+
+        await txn.insert('CustomerDebts', {
+          'customer_id': id,
+          'type': 'debt',
+          'amount': initialDebtCentavos,
+          'balance_after': initialDebtCentavos,
+          'notes': note,
+          'sale_id': null,
+          'timestamp': now,
+        });
+      }
+
+      return Debtor(
+        id: id,
+        name: trimmed,
+        currentBalance: initialDebtCentavos,
+        activeDebt: initialDebtCentavos > 0,
+        createdAt: now,
+        updatedAt: now,
+      );
+    });
   }
 
   Future<List<DebtTransaction>> getCustomerTransactions(int customerId) async {
