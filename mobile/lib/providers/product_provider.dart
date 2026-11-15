@@ -90,4 +90,15 @@ class ProductProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  Future<void> deleteProduct(int productId) async {
+    try {
+      await api.deleteProduct(productId);
+      await loadProducts();
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
 }

@@ -52,7 +52,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final customCategoryController = TextEditingController();
     String selectedCategory = 'General';
     bool isCustomCategory = false;
-    bool isBarcodeless = false;
     String pricingType = 'unit'; // 'unit' or 'weight'
     String unit = 'pc';
 
@@ -86,43 +85,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Loose / No Barcode Toggle
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: const Text('Loose Item / No Barcode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      subtitle: const Text('Auto-generates clean PLU identifier', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                      value: isBarcodeless,
-                      activeColor: AppTheme.primaryGreen,
-                      onChanged: (val) {
-                        setDialogState(() {
-                          isBarcodeless = val ?? false;
-                          if (isBarcodeless) {
-                            barcodeController.clear();
-                          }
-                        });
-                      },
-                    ),
-                    if (!isBarcodeless) ...[
-                      TextField(
-                        controller: barcodeController,
-                        decoration: InputDecoration(
-                          labelText: 'Barcode / Scan Code',
-                          hintText: 'Enter or generate barcode...',
-                          prefixIcon: const Icon(Icons.qr_code),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.casino_outlined),
-                            tooltip: 'Generate Random Barcode',
-                            onPressed: () {
-                              setDialogState(() {
-                                barcodeController.text = generateRandomBarcode();
-                              });
-                            },
-                          ),
+                    TextField(
+                      controller: barcodeController,
+                      decoration: InputDecoration(
+                        labelText: 'Barcode (Optional)',
+                        hintText: 'Leave empty for loose / no barcode',
+                        prefixIcon: const Icon(Icons.qr_code),
+                        helperText: 'Auto-generates PLU code if left blank',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.casino_outlined),
+                          tooltip: 'Generate Random Barcode',
+                          onPressed: () {
+                            setDialogState(() {
+                              barcodeController.text = generateRandomBarcode();
+                            });
+                          },
                         ),
                       ),
-                      const SizedBox(height: 12),
-                    ],
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: nameController,
                       textCapitalization: TextCapitalization.words,
@@ -295,15 +276,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
                   onPressed: () async {
                     final barcode = barcodeController.text.trim();
+                    final isBarcodeless = barcode.isEmpty;
                     final name = nameController.text.trim();
                     final priceText = priceController.text.trim();
 
-                    if (!isBarcodeless && barcode.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please enter/scan a barcode or check Loose Item'), backgroundColor: AppTheme.dangerRed),
-                      );
-                      return;
-                    }
                     if (name.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Please enter a product name'), backgroundColor: AppTheme.dangerRed),
@@ -765,40 +741,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            product.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (product.isBarcodeless) ...[
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.shade50,
-                              border: Border.all(color: Colors.amber.shade400),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text('🏷️ Loose', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.brown)),
-                          ),
-                        ],
-                        if (product.isWeighted) ...[
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: Colors.indigo.shade50,
-                              border: Border.all(color: Colors.indigo.shade200),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text('⚖️ ${product.unit}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.indigo)),
-                          ),
-                        ],
-                      ],
+                    Text(
+                      product.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -840,15 +785,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: const Icon(Icons.tune, size: 14),
-                    label: const Text('Adjust', style: TextStyle(fontSize: 12)),
-                    onPressed: () => _showAdjustStockDialog(product),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        icon: const Icon(Icons.tune, size: 14),
+                        label: const Text('Adjust', style: TextStyle(fontSize: 12)),
+                        onPressed: () => _showAdjustStockDialog(product),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20, color: AppTheme.dangerRed),
+                        tooltip: 'Delete Product',
+                        padding: const EdgeInsets.all(4),
+                        constraints: const BoxConstraints(),
+                        onPressed: () => _confirmDeleteProduct(product),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -857,6 +815,47 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteProduct(Product product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.delete_forever, color: AppTheme.dangerRed),
+            SizedBox(width: 8),
+            Text('Delete Product', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text('Are you sure you want to delete "${product.name}"? It will be removed from your catalog and cart.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.dangerRed),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      try {
+        await context.read<ProductProvider>().deleteProduct(product.id);
+        messenger.showSnackBar(
+          SnackBar(content: Text('Product "${product.name}" deleted successfully.')),
+        );
+      } catch (e) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Failed to delete product: $e'), backgroundColor: AppTheme.dangerRed),
+        );
+      }
+    }
   }
 
   IconData _categoryIconData(String category) {

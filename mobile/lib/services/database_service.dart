@@ -331,6 +331,21 @@ class DatabaseService {
     return Product.fromJson(rows.first);
   }
 
+  Future<void> deleteProduct(int productId) async {
+    await db.transaction((txn) async {
+      final rows = await txn.query('Products', where: 'id = ? AND active = ?', whereArgs: [productId, 1]);
+      if (rows.isEmpty) {
+        throw Exception('Product not found (ID: $productId)');
+      }
+      await txn.update(
+        'Products',
+        {'active': 0},
+        where: 'id = ?',
+        whereArgs: [productId],
+      );
+    });
+  }
+
   Future<Product> adjustStock(int productId, num delta, String reason) async {
     return await db.transaction<Product>((txn) async {
       final rows = await txn.query(

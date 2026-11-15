@@ -485,40 +485,9 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
                                     : (p.isBarcodeless ? Colors.brown : AppTheme.primaryGreen),
                               ),
                             ),
-                            title: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    p.name,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (p.isBarcodeless) ...[
-                                  const SizedBox(width: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                    decoration: BoxDecoration(
-                                      color: Colors.amber.shade50,
-                                      border: Border.all(color: Colors.amber.shade300),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('🏷️ Loose', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.brown)),
-                                  ),
-                                ],
-                                if (p.isWeighted) ...[
-                                  const SizedBox(width: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                    decoration: BoxDecoration(
-                                      color: Colors.indigo.shade50,
-                                      border: Border.all(color: Colors.indigo.shade200),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text('⚖️ ${p.unit}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.indigo)),
-                                  ),
-                                ],
-                              ],
+                            title: Text(
+                              p.name,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                             ),
                             subtitle: Text(
                               '${p.isBarcodeless ? 'PLU: ' : 'Barcode: '}${p.barcodeString}${p.stock != null ? ' • Stock: ${p.formattedStock}' : ''}',
@@ -582,31 +551,9 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            item.product.name,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        if (item.isWeighted) ...[
-                                          const SizedBox(width: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                            decoration: BoxDecoration(
-                                              color: Colors.indigo.shade50,
-                                              border: Border.all(color: Colors.indigo.shade200),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              '⚖️ ${item.formattedQuantityOrWeight}',
-                                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.indigo),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
+                                    Text(
+                                      item.product.name,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(

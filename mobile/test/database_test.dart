@@ -499,5 +499,30 @@ void main() {
       expect(fetchedRice.unit, 'kg');
       expect(fetchedRice.lineTotal, 2600);
     });
+
+    test('deleteProduct marks product inactive and excludes from catalog and barcode lookup', () async {
+      final product = await dbService.createProduct(
+        barcodeString: 'DELETE-ME-123',
+        name: 'Temporary Discontinued Item',
+        priceCentavos: 1500,
+      );
+
+      // Verify exists initially
+      var products = await dbService.getProducts();
+      expect(products.any((p) => p.id == product.id), true);
+      expect(await dbService.lookupBarcode('DELETE-ME-123'), isNotNull);
+
+      // Delete product
+      await dbService.deleteProduct(product.id);
+
+      // Verify removed from active catalog and lookup
+      products = await dbService.getProducts();
+      expect(products.any((p) => p.id == product.id), false);
+      expect(await dbService.lookupBarcode('DELETE-ME-123'), isNull);
+
+      // Deleting again or invalid ID throws Exception
+      expect(() => dbService.deleteProduct(product.id), throwsException);
+      expect(() => dbService.deleteProduct(999999), throwsException);
+    });
   });
 }

@@ -63,6 +63,10 @@ class ApiService {
     return await database.lookupBarcode(barcode);
   }
 
+  Future<void> deleteProduct(int productId) async {
+    await database.deleteProduct(productId);
+  }
+
   // Stock Adjustment
   Future<Product> adjustStock(int productId, num delta, String reason) async {
     return await database.adjustStock(productId, delta, reason);

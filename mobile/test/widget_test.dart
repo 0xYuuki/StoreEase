@@ -485,4 +485,61 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('InventoryScreen allows deleting a product with confirmation dialog', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Navigate to Inventory tab
+    await tester.tap(find.text('Inventory'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Nature Spring Bottled Water 500ml is at the top of the inventory
+    expect(find.text('Nature Spring Bottled Water 500ml'), findsOneWidget);
+
+    // Find and tap delete icon
+    final deleteButtons = find.byTooltip('Delete Product');
+    expect(deleteButtons, findsWidgets);
+
+    // Tap first delete button (Nature Spring Bottled Water 500ml)
+    await tester.tap(deleteButtons.first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Confirmation dialog appears
+    expect(find.text('Delete Product'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+
+    // Tap Delete in dialog
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Delete'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Confirmation snackbar appears and item is removed
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text('Nature Spring Bottled Water 500ml'), findsNothing);
+
+    await db.close();
+  });
 }
