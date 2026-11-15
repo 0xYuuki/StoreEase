@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:helen_store_mobile/main.dart';
+import 'package:helen_store_mobile/models/models.dart';
 import 'package:helen_store_mobile/providers/analytics_provider.dart';
 import 'package:helen_store_mobile/providers/cart_provider.dart';
 import 'package:helen_store_mobile/providers/debt_provider.dart';
@@ -79,6 +80,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('Sales History'), findsOneWidget);
+    expect(find.text('All Time'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('This Week'), findsOneWidget);
+    expect(find.text('This Month'), findsOneWidget);
 
     // Tap Analytics Tab
     await tester.tap(find.text('Analytics'));
@@ -208,6 +213,76 @@ void main() {
     await tester.enterText(searchField, 'xyz');
     await tester.pump();
     expect(find.text('No products starting with "xyz"'), findsOneWidget);
+
+    await db.close();
+  });
+
+  testWidgets('SalesScreen filters receipts by search input and date filter chips', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    // Create a starter sale
+    final egg = (await db.lookupBarcode('1'))!;
+    await db.checkout(
+      items: [CartItem(product: egg, quantity: 2)],
+      tenderedAmount: 5000,
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)..loadSales()),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)..loadAnalytics()),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Navigate to Sales tab
+    await tester.tap(find.text('Sales'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Sale #1'), findsOneWidget);
+    expect(find.text('1 sale • Total: ₱22.00'), findsOneWidget);
+
+    // Type query matching sale
+    final salesSearch = find.widgetWithText(TextField, 'Search receipt #, item, or customer...');
+    await tester.enterText(salesSearch, 'Egg');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sale #1'), findsOneWidget);
+
+    // Type query not matching
+    await tester.enterText(salesSearch, 'NonExistentItem');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sale #1'), findsNothing);
+    expect(find.text('No sales found matching your filters'), findsOneWidget);
+
+    // Tap Reset All Filters
+    await tester.tap(find.text('Reset All Filters'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sale #1'), findsOneWidget);
+
+    // Tap 'Today' chip
+    await tester.tap(find.text('Today'), warnIfMissed: false);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sale #1'), findsOneWidget);
 
     await db.close();
   });

@@ -10,6 +10,11 @@ class SalesProvider extends ChangeNotifier {
   int _page = 1;
   bool _hasMore = false;
 
+  // Active filter state
+  String? _from;
+  String? _to;
+  String? _search;
+
   SalesProvider({required this.api});
 
   List<SalesSummary> get sales => List.unmodifiable(_sales);
@@ -17,14 +22,43 @@ class SalesProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   int get page => _page;
   bool get hasMore => _hasMore;
+  String? get from => _from;
+  String? get to => _to;
+  String? get search => _search;
 
-  Future<void> loadSales({int page = 1, String? from, String? to}) async {
+  bool get hasActiveFilters =>
+      _from != null || _to != null || (_search != null && _search!.trim().isNotEmpty);
+
+  int get totalFilteredAmount => _sales.fold(0, (sum, s) => sum + s.totalAmount);
+
+  Future<void> loadSales({
+    int page = 1,
+    String? from,
+    String? to,
+    String? search,
+    bool isFilterChange = false,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
+    if (isFilterChange) {
+      _from = from;
+      _to = to;
+      _search = search;
+    }
+
+    final effectiveFrom = isFilterChange ? from : (from ?? _from);
+    final effectiveTo = isFilterChange ? to : (to ?? _to);
+    final effectiveSearch = isFilterChange ? search : (search ?? _search);
+
     try {
-      final data = await api.getSales(from: from, to: to, page: page);
+      final data = await api.getSales(
+        from: effectiveFrom,
+        to: effectiveTo,
+        search: effectiveSearch,
+        page: page,
+      );
       final rawSales = data['sales'] as List<SalesSummary>;
       final more = data['has_more'] as bool? ?? false;
 
@@ -42,6 +76,13 @@ class SalesProvider extends ChangeNotifier {
       _errorMessage = e.toString();
       notifyListeners();
     }
+  }
+
+  Future<void> clearFilters() async {
+    _from = null;
+    _to = null;
+    _search = null;
+    await loadSales(page: 1, isFilterChange: true);
   }
 
   Future<SaleReceipt> getReceipt(int saleId) async {

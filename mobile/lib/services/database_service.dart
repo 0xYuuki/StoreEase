@@ -680,32 +680,49 @@ class DatabaseService {
 
   // --- SALES HISTORY ---
 
-  Future<Map<String, dynamic>> getSales({String? from, String? to, int page = 1}) async {
+  Future<Map<String, dynamic>> getSales({String? from, String? to, String? search, int page = 1}) async {
     const limit = 25;
     final offset = (page - 1) * limit;
 
-    String whereClause = '';
-    List<dynamic> whereArgs = [];
+    final List<String> conditions = [];
+    final List<dynamic> whereArgs = [];
 
-    if (from != null && to != null) {
-      whereClause = 'WHERE s.timestamp >= ? AND s.timestamp <= ?';
-      whereArgs = [from, to];
-    } else if (from != null) {
-      whereClause = 'WHERE s.timestamp >= ?';
-      whereArgs = [from];
-    } else if (to != null) {
-      whereClause = 'WHERE s.timestamp <= ?';
-      whereArgs = [to];
+    if (from != null && from.trim().isNotEmpty) {
+      conditions.add('s.timestamp >= ?');
+      whereArgs.add(from.trim());
     }
+    if (to != null && to.trim().isNotEmpty) {
+      conditions.add('s.timestamp <= ?');
+      whereArgs.add(to.trim());
+    }
+
+    if (search != null && search.trim().isNotEmpty) {
+      final clean = search.trim().replaceAll('#', '');
+      conditions.add('''
+        (
+          CAST(s.id AS TEXT) LIKE ? OR
+          c.name LIKE ? OR
+          s.payment_type LIKE ? OR
+          s.id IN (SELECT sale_id FROM SaleItems WHERE product_name LIKE ?)
+        )
+      ''');
+      final pattern = '%$clean%';
+      whereArgs.addAll([pattern, pattern, pattern, pattern]);
+    }
+
+    final whereClause = conditions.isEmpty ? '' : 'WHERE ${conditions.join(' AND ')}';
 
     final query = '''
       SELECT 
         s.id, 
         s.timestamp, 
         s.total_amount, 
+        s.payment_type,
+        c.name AS customer_name,
         COUNT(si.id) AS item_count
       FROM Sales s
       LEFT JOIN SaleItems si ON si.sale_id = s.id
+      LEFT JOIN Customers c ON c.id = s.customer_id
       $whereClause
       GROUP BY s.id
       ORDER BY s.id DESC
@@ -721,6 +738,8 @@ class DatabaseService {
       timestamp: r['timestamp'] as String? ?? '',
       totalAmount: r['total_amount'] as int,
       itemCount: (r['item_count'] as int?) ?? 0,
+      customerName: r['customer_name'] as String?,
+      paymentType: r['payment_type'] as String?,
     )).toList();
 
     return {

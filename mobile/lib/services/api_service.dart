@@ -114,8 +114,8 @@ class ApiService {
   }
 
   // Sales History
-  Future<Map<String, dynamic>> getSales({String? from, String? to, int page = 1}) async {
-    return await database.getSales(from: from, to: to, page: page);
+  Future<Map<String, dynamic>> getSales({String? from, String? to, String? search, int page = 1}) async {
+    return await database.getSales(from: from, to: to, search: search, page: page);
   }
 
   Future<SaleReceipt> getReceipt(int saleId) async {

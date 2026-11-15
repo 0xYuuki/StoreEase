@@ -347,6 +347,61 @@ void main() {
       expect(data.chartData.data.last >= 6800, true);
     });
 
+    test('getSales filters records by date range, customer, item name, and receipt ID', () async {
+      final egg = (await dbService.lookupBarcode('1'))!;
+      final beer = (await dbService.lookupBarcode('4800016644804'))!; // San Miguel Pale Pilsen
+
+      // Sale 1: Cash sale with Egg
+      final receipt1 = await dbService.checkout(
+        items: [CartItem(product: egg, quantity: 1)],
+        tenderedAmount: 5000,
+      );
+
+      // Sale 2: Debt sale with Beer to Aling Nena
+      final debtors = await dbService.getDebtors();
+      final alingNena = debtors.firstWhere((d) => d.name == 'Aling Nena');
+      final receipt2 = await dbService.checkout(
+        items: [CartItem(product: beer, quantity: 1)],
+        tenderedAmount: 0,
+        debtorId: alingNena.id,
+      );
+
+      // 1. Search by exact receipt ID
+      final resId = await dbService.getSales(search: '${receipt1.saleId}');
+      final salesId = resId['sales'] as List<SalesSummary>;
+      expect(salesId.any((s) => s.id == receipt1.saleId), true);
+      expect(salesId.any((s) => s.id == receipt2.saleId), false);
+
+      // 2. Search by product name
+      final resItem = await dbService.getSales(search: 'Pilsen');
+      final salesItem = resItem['sales'] as List<SalesSummary>;
+      expect(salesItem.any((s) => s.id == receipt2.saleId), true);
+      expect(salesItem.any((s) => s.id == receipt1.saleId), false);
+
+      // 3. Search by customer name
+      final resCustomer = await dbService.getSales(search: 'Aling Nena');
+      final salesCustomer = resCustomer['sales'] as List<SalesSummary>;
+      expect(salesCustomer.any((s) => s.id == receipt2.saleId), true);
+      expect(salesCustomer.any((s) => s.id == receipt1.saleId), false);
+      expect(salesCustomer.first.customerName, 'Aling Nena');
+      expect(salesCustomer.first.paymentType, 'debt');
+
+      // 4. Date range filter
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
+      final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59, 999).toIso8601String();
+      final resToday = await dbService.getSales(from: todayStart, to: todayEnd);
+      final salesToday = resToday['sales'] as List<SalesSummary>;
+      expect(salesToday.length >= 2, true);
+
+      // Future date range should return 0
+      final futureStart = DateTime(now.year + 1, 1, 1).toIso8601String();
+      final futureEnd = DateTime(now.year + 1, 1, 2).toIso8601String();
+      final resFuture = await dbService.getSales(from: futureStart, to: futureEnd);
+      final salesFuture = resFuture['sales'] as List<SalesSummary>;
+      expect(salesFuture.isEmpty, true);
+    });
+
     test('Reset to sample data clears and restores initial dataset', () async {
       // Create extra customer
       await dbService.createDebtor('Temporary Customer');

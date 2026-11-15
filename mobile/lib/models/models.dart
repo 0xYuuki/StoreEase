@@ -251,12 +251,16 @@ class SalesSummary {
   final String timestamp;
   final int totalAmount; // centavos
   final int itemCount;
+  final String? customerName;
+  final String? paymentType;
 
   SalesSummary({
     required this.id,
     required this.timestamp,
     required this.totalAmount,
     required this.itemCount,
+    this.customerName,
+    this.paymentType,
   });
 
   double get totalPesos => totalAmount / 100.0;
@@ -268,6 +272,8 @@ class SalesSummary {
       timestamp: json['timestamp'] as String? ?? '',
       totalAmount: json['total_amount'] as int,
       itemCount: (json['item_count'] as int?) ?? 0,
+      customerName: json['customer_name'] as String?,
+      paymentType: json['payment_type'] as String?,
     );
   }
 }
