@@ -158,4 +158,57 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('POS search uses first-letter prefix matching and displays vertical up/down preview list', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)..loadSales()),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)..loadAnalytics()),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Type 'e' in search bar
+    final searchField = find.byType(TextField).first;
+    await tester.enterText(searchField, 'e');
+    await tester.pump();
+
+    // Verify prefix match: 'Egg' matches because it starts with 'e'
+    expect(find.text('Egg'), findsOneWidget);
+    // 'Lucky Me! Pancit Canton' and 'Mega Sardines' should NOT match even though they contain 'e' inside
+    expect(find.text('Lucky Me! Pancit Canton (Original)'), findsNothing);
+    expect(find.text('Mega Sardines in Tomato Sauce 155g'), findsNothing);
+
+    // Tap 'Egg' to add it to cart from vertical search preview
+    await tester.tap(find.text('Egg'));
+    await tester.pump();
+
+    // Cart now has 1 item (Egg) and total is ₱11.00
+    expect(find.text('TOTAL (1 items)'), findsOneWidget);
+    expect(find.text('₱11.00'), findsWidgets);
+
+    // Type query with no matches
+    await tester.enterText(searchField, 'xyz');
+    await tester.pump();
+    expect(find.text('No products starting with "xyz"'), findsOneWidget);
+
+    await db.close();
+  });
 }

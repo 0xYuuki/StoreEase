@@ -328,8 +328,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final filtered = query.isEmpty
         ? allProducts
         : allProducts.where((p) {
-            return p.name.toLowerCase().contains(query) ||
-                p.barcodeString.toLowerCase().contains(query);
+            final name = p.name.trim().toLowerCase();
+            final barcode = p.barcodeString.trim().toLowerCase();
+            return name.startsWith(query) || barcode.startsWith(query);
           }).toList();
 
     return Scaffold(

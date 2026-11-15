@@ -240,8 +240,9 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
     final filteredProducts = query.isEmpty
         ? <Product>[]
         : allProducts.where((p) {
-            return p.name.toLowerCase().contains(query) ||
-                p.barcodeString.toLowerCase().contains(query);
+            final name = p.name.trim().toLowerCase();
+            final barcode = p.barcodeString.trim().toLowerCase();
+            return name.startsWith(query) || barcode.startsWith(query);
           }).toList();
 
     return Scaffold(
@@ -355,26 +356,75 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
             ),
           ),
 
-          // Instant Product Add Chips (if searching)
-          if (_searchController.text.isNotEmpty && filteredProducts.isNotEmpty)
+          // Vertical Search Preview List (Up/Down)
+          if (_searchController.text.isNotEmpty)
             Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: filteredProducts.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final p = filteredProducts[index];
-                  return ActionChip(
-                    avatar: const Icon(Icons.add, size: 16),
-                    label: Text('${p.name} (${p.formattedPrice})'),
-                    onPressed: () {
-                      AudioService.playScanBeep();
-                      cart.addProduct(p);
-                    },
-                  );
-                },
+              constraints: const BoxConstraints(maxHeight: 220),
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Material(
+                color: Colors.white,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: AppTheme.accentGreen, width: 1.5),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: filteredProducts.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.search_off, size: 20, color: Colors.grey.shade400),
+                            const SizedBox(width: 8),
+                            Text(
+                              'No products starting with "${_searchController.text}"',
+                              style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: filteredProducts.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final p = filteredProducts[index];
+                          return ListTile(
+                            dense: true,
+                            leading: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: AppTheme.primaryLight,
+                              child: const Icon(Icons.inventory_2_outlined, size: 16, color: AppTheme.primaryGreen),
+                            ),
+                            title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            subtitle: Text(
+                              'Barcode: ${p.barcodeString}${p.stock != null ? ' • Stock: ${p.stock}' : ''}',
+                              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(p.formattedPrice, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryDark)),
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  icon: const Icon(Icons.add_circle, color: AppTheme.primaryGreen, size: 24),
+                                  tooltip: 'Add to Cart',
+                                  onPressed: () {
+                                    AudioService.playScanBeep();
+                                    cart.addProduct(p);
+                                  },
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              AudioService.playScanBeep();
+                              cart.addProduct(p);
+                            },
+                          );
+                        },
+                      ),
               ),
             ),
 
