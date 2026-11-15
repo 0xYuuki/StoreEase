@@ -24,7 +24,6 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _tenderedController = TextEditingController();
   bool _showScanner = false;
-  String _posFilter = 'all'; // 'all', 'loose', 'weight'
 
   // Barcode scan throttling & interval control
   DateTime? _lastScanTime;
@@ -272,16 +271,13 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
     final allProducts = productProv.products;
 
     final query = _searchController.text.trim().toLowerCase();
-    final filteredProducts = allProducts.where((p) {
-      if (_posFilter == 'loose' && !p.isBarcodeless) return false;
-      if (_posFilter == 'weight' && !p.isWeighted) return false;
-      if (query.isNotEmpty) {
-        final name = p.name.trim().toLowerCase();
-        final barcode = p.barcodeString.trim().toLowerCase();
-        return name.startsWith(query) || barcode.startsWith(query);
-      }
-      return _posFilter != 'all';
-    }).toList();
+    final filteredProducts = query.isEmpty
+        ? <Product>[]
+        : allProducts.where((p) {
+            final name = p.name.trim().toLowerCase();
+            final barcode = p.barcodeString.trim().toLowerCase();
+            return name.startsWith(query) || barcode.startsWith(query);
+          }).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -394,45 +390,8 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
             ),
           ),
 
-          // Quick Filter Chips (All, Loose Items, By Weight)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-            child: Row(
-              children: [
-                ChoiceChip(
-                  label: const Text('All Items'),
-                  selected: _posFilter == 'all',
-                  onSelected: (val) {
-                    if (val) setState(() => _posFilter = 'all');
-                  },
-                ),
-                const SizedBox(width: 6),
-                ChoiceChip(
-                  avatar: const Text('🏷️', style: TextStyle(fontSize: 12)),
-                  label: const Text('Loose Items (No Barcode)'),
-                  selected: _posFilter == 'loose',
-                  selectedColor: AppTheme.primaryLight,
-                  onSelected: (val) {
-                    setState(() => _posFilter = val ? 'loose' : 'all');
-                  },
-                ),
-                const SizedBox(width: 6),
-                ChoiceChip(
-                  avatar: const Text('⚖️', style: TextStyle(fontSize: 12)),
-                  label: const Text('By Weight (Timbang)'),
-                  selected: _posFilter == 'weight',
-                  selectedColor: AppTheme.primaryLight,
-                  onSelected: (val) {
-                    setState(() => _posFilter = val ? 'weight' : 'all');
-                  },
-                ),
-              ],
-            ),
-          ),
-
           // Vertical Search Preview List (Up/Down)
-          if (_searchController.text.isNotEmpty || _posFilter != 'all')
+          if (_searchController.text.isNotEmpty)
             Container(
               constraints: const BoxConstraints(maxHeight: 220),
               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

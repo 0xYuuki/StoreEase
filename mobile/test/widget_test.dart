@@ -420,7 +420,7 @@ void main() {
     await db.close();
   });
 
-  testWidgets('POS displays Loose Items and By Weight filter chips and filters products', (WidgetTester tester) async {
+  testWidgets('POS searches loose and weighted items cleanly without filter chips', (WidgetTester tester) async {
     final db = DatabaseService();
     await db.init(customPath: inMemoryDatabasePath);
     final storage = StorageService();
@@ -460,28 +460,27 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    // Verify filter chips exist on POS screen
-    expect(find.text('All Items'), findsOneWidget);
-    expect(find.text('Loose Items (No Barcode)'), findsOneWidget);
-    expect(find.text('By Weight (Timbang)'), findsOneWidget);
+    // Verify filter chips are removed from POS screen
+    expect(find.text('All Items'), findsNothing);
+    expect(find.text('Loose Items (No Barcode)'), findsNothing);
+    expect(find.text('By Weight (Timbang)'), findsNothing);
 
-    // Tap Loose Items filter chip
-    await tester.tap(find.text('Loose Items (No Barcode)'));
+    // Search for loose item 'Fresh'
+    final searchInput = find.byWidgetPredicate(
+      (w) => w is TextField && w.decoration?.hintText == 'Search product or barcode...',
+    );
+    await tester.enterText(searchInput, 'Fresh');
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    // Fresh Egg and Sinandomeng Rice (both barcodeless) appear in preview list
     expect(find.text('Fresh Egg'), findsOneWidget);
-    expect(find.text('Sinandomeng Rice'), findsOneWidget);
 
-    // Tap By Weight filter chip
-    await tester.tap(find.text('By Weight (Timbang)'));
+    // Search for weighted item 'Sinandomeng'
+    await tester.enterText(searchInput, 'Sinandomeng');
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    // Only Sinandomeng Rice appears under By Weight
     expect(find.text('Sinandomeng Rice'), findsOneWidget);
-    expect(find.text('Fresh Egg'), findsNothing);
 
     await db.close();
   });
@@ -539,6 +538,97 @@ void main() {
     // Confirmation snackbar appears and item is removed
     expect(find.byType(SnackBar), findsOneWidget);
     expect(find.text('Nature Spring Bottled Water 500ml'), findsNothing);
+
+    await db.close();
+  });
+
+  testWidgets('Add Product dialog supports custom category popup and full-width stock alert fields without overflow', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Navigate to Inventory tab
+    await tester.tap(find.text('Inventory'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Tap Add Product FAB
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify Add New Product dialog is opened
+    expect(find.text('Add New Product'), findsOneWidget);
+
+    // Verify full-width stock and reorder alert field labels exist
+    expect(find.text('Initial Stock (in pieces)'), findsOneWidget);
+    expect(find.text('Low Stock Alert Level (in pieces)'), findsOneWidget);
+
+    // Open category dropdown
+    await tester.tap(find.text('General'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Select + Custom Category...
+    await tester.tap(find.text('+ Custom Category...').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify New Category popup dialog opened
+    expect(find.text('New Category'), findsOneWidget);
+    final catField = find.widgetWithText(TextField, 'Category Name');
+    expect(catField, findsOneWidget);
+
+    // Enter custom category name
+    await tester.enterText(catField, 'Bakery');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Add Category'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Enter product details
+    final nameField = find.widgetWithText(TextField, 'Product Name');
+    await tester.enterText(nameField, 'Pan de Sal 10s');
+    await tester.pump();
+
+    final priceField = find.widgetWithText(TextField, 'Price per piece (₱)');
+    await tester.enterText(priceField, '25.00');
+    await tester.pump();
+
+    final stockField = find.widgetWithText(TextField, 'Initial Stock (in pieces)');
+    await tester.enterText(stockField, '50');
+    await tester.pump();
+
+    final reorderField = find.widgetWithText(TextField, 'Low Stock Alert Level (in pieces)');
+    await tester.enterText(reorderField, '10');
+    await tester.pump();
+
+    // Tap Save Product
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Save Product'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Verify product added and visible
+    expect(find.text('Pan de Sal 10s'), findsOneWidget);
 
     await db.close();
   });

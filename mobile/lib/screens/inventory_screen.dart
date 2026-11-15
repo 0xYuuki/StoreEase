@@ -43,15 +43,59 @@ class _InventoryScreenState extends State<InventoryScreen> {
     super.dispose();
   }
 
+  Future<String?> _showCustomCategoryDialog(BuildContext context) async {
+    final catController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.add_circle_outline, color: AppTheme.primaryGreen),
+              SizedBox(width: 8),
+              Text('New Category', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: TextField(
+            controller: catController,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Category Name',
+              hintText: 'e.g. Bakery, Spices, Dairy...',
+              prefixIcon: Icon(Icons.category_outlined),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
+              onPressed: () {
+                final text = catController.text.trim();
+                if (text.isNotEmpty) {
+                  Navigator.of(ctx).pop(text);
+                }
+              },
+              child: const Text('Add Category', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _showAddProductDialog() async {
     final barcodeController = TextEditingController();
     final nameController = TextEditingController();
     final priceController = TextEditingController();
     final stockController = TextEditingController();
     final reorderController = TextEditingController();
-    final customCategoryController = TextEditingController();
+    final List<String> availableCategories = List.from(_standardCategories);
     String selectedCategory = 'General';
-    bool isCustomCategory = false;
     String pricingType = 'unit'; // 'unit' or 'weight'
     String unit = 'pc';
 
@@ -70,7 +114,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              scrollable: true,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: Row(
                 children: const [
                   Icon(Icons.add_shopping_cart, color: AppTheme.primaryGreen),
@@ -80,191 +124,196 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                 ],
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: barcodeController,
-                      decoration: InputDecoration(
-                        labelText: 'Barcode (Optional)',
-                        hintText: 'Leave empty for loose / no barcode',
-                        prefixIcon: const Icon(Icons.qr_code),
-                        helperText: 'Auto-generates PLU code if left blank',
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.casino_outlined),
-                          tooltip: 'Generate Random Barcode',
-                          onPressed: () {
-                            setDialogState(() {
-                              barcodeController.text = generateRandomBarcode();
-                            });
-                          },
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: barcodeController,
+                        decoration: InputDecoration(
+                          labelText: 'Barcode (Optional)',
+                          hintText: 'Leave empty for loose / no barcode',
+                          prefixIcon: const Icon(Icons.qr_code),
+                          helperText: 'Auto-generates PLU code if left blank',
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.casino_outlined),
+                            tooltip: 'Generate Random Barcode',
+                            onPressed: () {
+                              setDialogState(() {
+                                barcodeController.text = generateRandomBarcode();
+                              });
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: nameController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Product Name',
-                        hintText: 'e.g. Orange Juice, Potato Chips...',
-                        prefixIcon: Icon(Icons.label_outline),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedCategory,
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        prefixIcon: Icon(Icons.category_outlined),
-                      ),
-                      items: [
-                        ..._standardCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))),
-                        const DropdownMenuItem(value: '__custom__', child: Text('+ Custom Category...')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() {
-                            if (val == '__custom__') {
-                              isCustomCategory = true;
-                            } else {
-                              isCustomCategory = false;
-                              selectedCategory = val;
-                            }
-                          });
-                        }
-                      },
-                    ),
-                    if (isCustomCategory) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       TextField(
-                        controller: customCategoryController,
+                        controller: nameController,
                         textCapitalization: TextCapitalization.words,
                         decoration: const InputDecoration(
-                          labelText: 'Custom Category Name',
-                          hintText: 'e.g. Bakery, Medicines...',
-                          prefixIcon: Icon(Icons.edit_note),
+                          labelText: 'Product Name',
+                          hintText: 'e.g. Orange Juice, Potato Chips...',
+                          prefixIcon: Icon(Icons.label_outline),
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 12),
-
-                    // Pricing Type Selector (By Piece vs By Weight)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.all(3),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setDialogState(() {
-                                  pricingType = 'unit';
-                                  unit = 'pc';
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: pricingType == 'unit' ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: pricingType == 'unit'
-                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
-                                      : null,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '📦 By Piece (pc)',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: pricingType == 'unit' ? AppTheme.primaryDark : AppTheme.textMuted,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setDialogState(() {
-                                  pricingType = 'weight';
-                                  unit = 'kg';
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: pricingType == 'weight' ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: pricingType == 'weight'
-                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
-                                      : null,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '⚖️ By Weight (kg)',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: pricingType == 'weight' ? AppTheme.primaryDark : AppTheme.textMuted,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        key: ValueKey(selectedCategory),
+                        initialValue: selectedCategory,
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                          prefixIcon: Icon(Icons.category_outlined),
+                        ),
+                        items: [
+                          ...availableCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))),
+                          const DropdownMenuItem(
+                            value: '__custom__',
+                            child: Row(
+                              children: [
+                                Icon(Icons.add, size: 16, color: AppTheme.primaryGreen),
+                                SizedBox(width: 4),
+                                Text('+ Custom Category...'),
+                              ],
                             ),
                           ),
                         ],
+                        onChanged: (val) async {
+                          if (val == '__custom__') {
+                            final customName = await _showCustomCategoryDialog(context);
+                            if (customName != null && customName.isNotEmpty) {
+                              setDialogState(() {
+                                if (!availableCategories.contains(customName)) {
+                                  availableCategories.add(customName);
+                                }
+                                selectedCategory = customName;
+                              });
+                            } else {
+                              setDialogState(() {});
+                            }
+                          } else if (val != null) {
+                            setDialogState(() {
+                              selectedCategory = val;
+                            });
+                          }
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-                    TextField(
-                      controller: priceController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        labelText: pricingType == 'weight' ? 'Price per kg (₱)' : 'Price per piece (₱)',
-                        hintText: '0.00',
-                        prefixText: '₱ ',
-                        prefixIcon: const Icon(Icons.payments_outlined),
-                        suffixText: pricingType == 'weight' ? '/ kg' : '/ pc',
+                      // Pricing Type Selector (By Piece vs By Weight)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.all(3),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setDialogState(() {
+                                    pricingType = 'unit';
+                                    unit = 'pc';
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: pricingType == 'unit' ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: pricingType == 'unit'
+                                        ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
+                                        : null,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '📦 By Piece (pc)',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: pricingType == 'unit' ? AppTheme.primaryDark : AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setDialogState(() {
+                                    pricingType = 'weight';
+                                    unit = 'kg';
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: pricingType == 'weight' ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: pricingType == 'weight'
+                                        ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
+                                        : null,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '⚖️ By Weight (kg)',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: pricingType == 'weight' ? AppTheme.primaryDark : AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: stockController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: InputDecoration(
-                              labelText: pricingType == 'weight' ? 'Initial Stock (kg)' : 'Initial Stock (pcs)',
-                              hintText: 'Optional',
-                              prefixIcon: const Icon(Icons.inventory_2_outlined),
-                            ),
-                          ),
+                      const SizedBox(height: 12),
+
+                      TextField(
+                        controller: priceController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: pricingType == 'weight' ? 'Price per kg (₱)' : 'Price per piece (₱)',
+                          hintText: '0.00',
+                          prefixText: '₱ ',
+                          prefixIcon: const Icon(Icons.payments_outlined),
+                          suffixText: pricingType == 'weight' ? '/ kg' : '/ pc',
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: reorderController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: InputDecoration(
-                              labelText: pricingType == 'weight' ? 'Reorder Alert (kg)' : 'Reorder Alert (pcs)',
-                              hintText: 'Optional',
-                              prefixIcon: const Icon(Icons.warning_amber_outlined),
-                            ),
-                          ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Initial Stock Field (Full width to avoid text truncation)
+                      TextField(
+                        controller: stockController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: pricingType == 'weight' ? 'Initial Stock (in kg)' : 'Initial Stock (in pieces)',
+                          hintText: 'e.g. 50 (Optional)',
+                          prefixIcon: const Icon(Icons.inventory_2_outlined),
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Low Stock Alert Level Field (Full width to avoid text truncation)
+                      TextField(
+                        controller: reorderController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: pricingType == 'weight' ? 'Low Stock Alert Level (in kg)' : 'Low Stock Alert Level (in pieces)',
+                          hintText: 'e.g. 10 (Optional)',
+                          prefixIcon: const Icon(Icons.warning_amber_outlined),
+                          helperText: 'Alerts you when stock drops below this number',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -302,10 +351,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         ? double.tryParse(reorderController.text.trim())
                         : null;
 
-                    final categoryToSave = isCustomCategory
-                        ? customCategoryController.text.trim()
-                        : selectedCategory;
-                    final finalCategory = categoryToSave.isEmpty ? 'General' : categoryToSave;
+                    final finalCategory = selectedCategory.trim().isEmpty ? 'General' : selectedCategory.trim();
 
                     final productProv = context.read<ProductProvider>();
                     final messenger = ScaffoldMessenger.of(context);
