@@ -630,394 +630,426 @@ class AppDialogs {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        double currentWeight = initialWeight ?? 0.50;
-        int activeTab = 0; // 0 = By Weight, 1 = By Amount
-        final weightCtrl = TextEditingController(
-          text: currentWeight % 1 == 0 ? currentWeight.toInt().toString() : currentWeight.toStringAsFixed(2),
-        );
-        final amountCtrl = TextEditingController(
-          text: (currentWeight * product.pricePesos).toStringAsFixed(2),
-        );
+      builder: (ctx) => _WeightEntrySheet(
+        product: product,
+        initialWeight: initialWeight,
+      ),
+    );
+  }
+}
 
-        final weightPresets = [
-          {'label': '1/4 kg', 'weight': 0.25, 'sub': '250g'},
-          {'label': '1/2 kg', 'weight': 0.50, 'sub': '500g'},
-          {'label': '3/4 kg', 'weight': 0.75, 'sub': '750g'},
-          {'label': '1 kg', 'weight': 1.0, 'sub': '1000g'},
-          {'label': '2 kg', 'weight': 2.0, 'sub': '2000g'},
-          {'label': '5 kg', 'weight': 5.0, 'sub': '5000g'},
-        ];
+class _WeightEntrySheet extends StatefulWidget {
+  final Product product;
+  final double? initialWeight;
 
-        final amountPresets = [10.0, 20.0, 50.0, 100.0, 200.0];
+  const _WeightEntrySheet({
+    required this.product,
+    this.initialWeight,
+  });
 
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final lineTotalPesos = (currentWeight * product.pricePesos);
-            final grams = (currentWeight * 1000).round();
+  @override
+  State<_WeightEntrySheet> createState() => _WeightEntrySheetState();
+}
 
-            return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 16,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
+class _WeightEntrySheetState extends State<_WeightEntrySheet> {
+  late double _currentWeight;
+  int _activeTab = 0; // 0 = By Weight, 1 = By Amount
+  late final TextEditingController _weightCtrl;
+  late final TextEditingController _amountCtrl;
 
-                    // Product Title & Rate
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.scale_outlined, color: AppTheme.primaryGreen, size: 28),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                product.name,
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 2),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryLight,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'Price Rate: ₱${product.pricePesos.toStringAsFixed(2)} / ${product.unit}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.primaryDark,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.of(ctx).pop(null),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
+  static const List<Map<String, dynamic>> _weightPresets = [
+    {'label': '1/4 kg', 'weight': 0.25, 'sub': '250g'},
+    {'label': '1/2 kg', 'weight': 0.50, 'sub': '500g'},
+    {'label': '3/4 kg', 'weight': 0.75, 'sub': '750g'},
+    {'label': '1 kg', 'weight': 1.0, 'sub': '1000g'},
+    {'label': '2 kg', 'weight': 2.0, 'sub': '2000g'},
+    {'label': '5 kg', 'weight': 5.0, 'sub': '5000g'},
+  ];
 
-                    // Tab selector (By Weight vs By Amount)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.all(3),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setModalState(() {
-                                  activeTab = 0;
-                                  weightCtrl.text = currentWeight % 1 == 0
-                                      ? currentWeight.toInt().toString()
-                                      : currentWeight.toStringAsFixed(2);
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: activeTab == 0 ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: activeTab == 0
-                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
-                                      : null,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '⚖️ By Weight (${product.unit})',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: activeTab == 0 ? AppTheme.primaryDark : AppTheme.textMuted,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setModalState(() {
-                                  activeTab = 1;
-                                  amountCtrl.text = lineTotalPesos.toStringAsFixed(2);
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: activeTab == 1 ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: activeTab == 1
-                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
-                                      : null,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '₱ By Amount (Halaga)',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: activeTab == 1 ? AppTheme.primaryDark : AppTheme.textMuted,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
+  static const List<double> _amountPresets = [10.0, 20.0, 50.0, 100.0, 200.0];
 
-                    // TAB 0: By Weight Content
-                    if (activeTab == 0) ...[
-                      const Text(
-                        'QUICK SARI-SARI PRESETS:',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
-                      ),
-                      const SizedBox(height: 8),
-                      GridView.count(
-                        crossAxisCount: 3,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                        childAspectRatio: 1.8,
-                        children: weightPresets.map((preset) {
-                          final pWeight = preset['weight'] as double;
-                          final isSelected = (currentWeight - pWeight).abs() < 0.001;
-                          final cost = pWeight * product.pricePesos;
+  @override
+  void initState() {
+    super.initState();
+    _currentWeight = widget.initialWeight ?? 0.50;
+    _weightCtrl = TextEditingController(
+      text: _currentWeight % 1 == 0 ? _currentWeight.toInt().toString() : _currentWeight.toStringAsFixed(2),
+    );
+    _amountCtrl = TextEditingController(
+      text: (_currentWeight * widget.product.pricePesos).toStringAsFixed(2),
+    );
+  }
 
-                          return InkWell(
-                            onTap: () {
-                              setModalState(() {
-                                currentWeight = pWeight;
-                                weightCtrl.text = pWeight % 1 == 0
-                                    ? pWeight.toInt().toString()
-                                    : pWeight.toStringAsFixed(2);
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: isSelected ? AppTheme.primaryLight : Colors.grey.shade50,
-                                border: Border.all(
-                                  color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300,
-                                  width: isSelected ? 1.5 : 1,
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    preset['label'] as String,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: isSelected ? AppTheme.primaryDark : AppTheme.textDark,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${preset['sub']} • ₱${cost.toStringAsFixed(2)}',
-                                    style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: weightCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(
-                          labelText: 'Custom Weight (${product.unit})',
-                          hintText: 'e.g. 0.65',
-                          prefixIcon: const Icon(Icons.edit_outlined),
-                          suffixText: '= $grams grams',
-                          suffixStyle: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
-                        ),
-                        onChanged: (val) {
-                          final parsed = double.tryParse(val.trim());
-                          if (parsed != null && parsed > 0) {
-                            setModalState(() {
-                              currentWeight = parsed;
-                            });
-                          }
-                        },
-                      ),
-                    ] else ...[
-                      // TAB 1: By Amount Content
-                      const Text(
-                        'QUICK PESO AMOUNT PRESETS (HALAGA):',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: amountPresets.map((amt) {
-                          final equivWeight = product.pricePesos > 0 ? (amt / product.pricePesos) : 0.0;
-                          final isSelected = (lineTotalPesos - amt).abs() < 0.1;
+  @override
+  void dispose() {
+    _weightCtrl.dispose();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
 
-                          return ActionChip(
-                            label: Text('₱${amt.toStringAsFixed(0)} (${equivWeight.toStringAsFixed(2)} kg)'),
-                            backgroundColor: isSelected ? AppTheme.primaryLight : Colors.grey.shade100,
-                            side: BorderSide(
-                              color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300,
-                            ),
-                            labelStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected ? AppTheme.primaryDark : AppTheme.textDark,
-                            ),
-                            onPressed: () {
-                              setModalState(() {
-                                currentWeight = equivWeight;
-                                amountCtrl.text = amt.toStringAsFixed(2);
-                              });
-                            },
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: amountCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(
-                          labelText: 'Target Peso Amount (₱)',
-                          hintText: 'e.g. 25.00',
-                          prefixText: '₱ ',
-                          prefixIcon: const Icon(Icons.payments_outlined),
-                          suffixText: '= ${currentWeight.toStringAsFixed(3)} ${product.unit}',
-                          suffixStyle: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
-                        ),
-                        onChanged: (val) {
-                          final parsed = double.tryParse(val.trim());
-                          if (parsed != null && parsed > 0 && product.pricePesos > 0) {
-                            setModalState(() {
-                              currentWeight = parsed / product.pricePesos;
-                            });
-                          }
-                        },
-                      ),
-                    ],
+  @override
+  Widget build(BuildContext context) {
+    final lineTotalPesos = (_currentWeight * widget.product.pricePesos);
+    final grams = (_currentWeight * 1000).round();
 
-                    const SizedBox(height: 16),
-
-                    // Calculation Summary Card
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryLight.withValues(alpha: 0.5),
-                        border: Border.all(color: AppTheme.accentGreen),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Weight: ${currentWeight % 1 == 0 ? currentWeight.toInt() : currentWeight.toStringAsFixed(2)} ${product.unit} ($grams g)',
-                                style: const TextStyle(fontSize: 12, color: AppTheme.textDark),
-                              ),
-                              Text(
-                                '@ ₱${product.pricePesos.toStringAsFixed(2)}/${product.unit}',
-                                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Calculated Total:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                              Text(
-                                '₱${lineTotalPesos.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: AppTheme.primaryDark,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(ctx).pop(null),
-                            child: const Text('Cancel'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryGreen,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            onPressed: () {
-                              if (currentWeight <= 0) return;
-                              Navigator.of(ctx).pop(currentWeight);
-                            },
-                            child: Text(
-                              'Add ₱${lineTotalPesos.toStringAsFixed(2)} to Cart',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            );
-          },
-        );
-      },
+            ),
+            const SizedBox(height: 14),
+
+            // Product Title & Rate
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.scale_outlined, color: AppTheme.primaryGreen, size: 28),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.product.name,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryLight,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Price Rate: ₱${widget.product.pricePesos.toStringAsFixed(2)} / ${widget.product.unit}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryDark,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(null),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Tab selector (By Weight vs By Amount)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.all(3),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _activeTab = 0;
+                          _weightCtrl.text = _currentWeight % 1 == 0
+                              ? _currentWeight.toInt().toString()
+                              : _currentWeight.toStringAsFixed(2);
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _activeTab == 0 ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: _activeTab == 0
+                              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
+                              : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '⚖️ By Weight (${widget.product.unit})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: _activeTab == 0 ? AppTheme.primaryDark : AppTheme.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _activeTab = 1;
+                          _amountCtrl.text = lineTotalPesos.toStringAsFixed(2);
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _activeTab == 1 ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: _activeTab == 1
+                              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
+                              : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '₱ By Amount (Halaga)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: _activeTab == 1 ? AppTheme.primaryDark : AppTheme.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // TAB 0: By Weight Content
+            if (_activeTab == 0) ...[
+              const Text(
+                'QUICK SARI-SARI PRESETS:',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 8),
+              GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1.8,
+                children: _weightPresets.map((preset) {
+                  final pWeight = preset['weight'] as double;
+                  final isSelected = (_currentWeight - pWeight).abs() < 0.001;
+                  final cost = pWeight * widget.product.pricePesos;
+
+                  return InkWell(
+                    onTap: () {
+                      setState(() {
+                        _currentWeight = pWeight;
+                        _weightCtrl.text = pWeight % 1 == 0
+                            ? pWeight.toInt().toString()
+                            : pWeight.toStringAsFixed(2);
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppTheme.primaryLight : Colors.grey.shade50,
+                        border: Border.all(
+                          color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300,
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            preset['label'] as String,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? AppTheme.primaryDark : AppTheme.textDark,
+                            ),
+                          ),
+                          Text(
+                            '${preset['sub']} • ₱${cost.toStringAsFixed(2)}',
+                            style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _weightCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Custom Weight (${widget.product.unit})',
+                  hintText: 'e.g. 0.65',
+                  prefixIcon: const Icon(Icons.edit_outlined),
+                  suffixText: '= $grams grams',
+                  suffixStyle: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
+                ),
+                onChanged: (val) {
+                  final parsed = double.tryParse(val.trim());
+                  if (parsed != null && parsed > 0) {
+                    setState(() {
+                      _currentWeight = parsed;
+                    });
+                  }
+                },
+              ),
+            ] else ...[
+              // TAB 1: By Amount Content
+              const Text(
+                'QUICK PESO AMOUNT PRESETS (HALAGA):',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _amountPresets.map((amt) {
+                  final equivWeight = widget.product.pricePesos > 0 ? (amt / widget.product.pricePesos) : 0.0;
+                  final isSelected = (lineTotalPesos - amt).abs() < 0.1;
+
+                  return ActionChip(
+                    label: Text('₱${amt.toStringAsFixed(0)} (${equivWeight.toStringAsFixed(2)} kg)'),
+                    backgroundColor: isSelected ? AppTheme.primaryLight : Colors.grey.shade100,
+                    side: BorderSide(
+                      color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300,
+                    ),
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? AppTheme.primaryDark : AppTheme.textDark,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _currentWeight = equivWeight;
+                        _amountCtrl.text = amt.toStringAsFixed(2);
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _amountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Target Peso Amount (₱)',
+                  hintText: 'e.g. 25.00',
+                  prefixText: '₱ ',
+                  prefixIcon: const Icon(Icons.payments_outlined),
+                  suffixText: '= ${_currentWeight.toStringAsFixed(3)} ${widget.product.unit}',
+                  suffixStyle: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
+                ),
+                onChanged: (val) {
+                  final parsed = double.tryParse(val.trim());
+                  if (parsed != null && parsed > 0 && widget.product.pricePesos > 0) {
+                    setState(() {
+                      _currentWeight = parsed / widget.product.pricePesos;
+                    });
+                  }
+                },
+              ),
+            ],
+
+            const SizedBox(height: 16),
+
+            // Calculation Summary Card
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryLight.withValues(alpha: 0.5),
+                border: Border.all(color: AppTheme.accentGreen),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Weight: ${_currentWeight % 1 == 0 ? _currentWeight.toInt() : _currentWeight.toStringAsFixed(2)} ${widget.product.unit} ($grams g)',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textDark),
+                      ),
+                      Text(
+                        '@ ₱${widget.product.pricePesos.toStringAsFixed(2)}/${widget.product.unit}',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Calculated Total:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(
+                        '₱${lineTotalPesos.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: AppTheme.primaryDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(null),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryGreen,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () {
+                      if (_currentWeight <= 0) return;
+                      Navigator.of(context).pop(_currentWeight);
+                    },
+                    child: Text(
+                      'Add ₱${lineTotalPesos.toStringAsFixed(2)} to Cart',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

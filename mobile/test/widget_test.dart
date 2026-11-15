@@ -691,4 +691,98 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('WeightEntryDialog preserves By Amount tab when entering target amount or keyboard opens', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    // Create a weighted product (Red Onion)
+    await db.createProduct(
+      name: 'Red Onion',
+      priceCentavos: 12000, // ₱120 per kg
+      initialStock: 25.0,
+      pricingType: 'weight',
+      unit: 'kg',
+      isBarcodeless: true,
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Search for Red Onion
+    final searchInput = find.byWidgetPredicate(
+      (w) => w is TextField && w.decoration?.hintText == 'Search product or barcode...',
+    );
+    await tester.enterText(searchInput, 'Red');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Tap Red Onion in search preview list to open weight modal
+    await tester.tap(find.text('Red Onion'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify modal opened with default By Weight tab presets
+    expect(find.text('QUICK SARI-SARI PRESETS:'), findsOneWidget);
+
+    // Switch to By Amount tab
+    await tester.tap(find.text('₱ By Amount (Halaga)'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify By Amount tab content is displayed
+    expect(find.text('QUICK PESO AMOUNT PRESETS (HALAGA):'), findsOneWidget);
+    expect(find.text('QUICK SARI-SARI PRESETS:'), findsNothing);
+
+    // Tap and enter target amount into Target Peso Amount field (simulating keyboard interaction)
+    final amountInput = find.widgetWithText(TextField, 'Target Peso Amount (₱)');
+    expect(amountInput, findsOneWidget);
+    await tester.enterText(amountInput, '30.00');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // CRITICAL CHECK: Still on By Amount tab, NOT reverted to By Weight tab
+    expect(find.text('QUICK PESO AMOUNT PRESETS (HALAGA):'), findsOneWidget);
+    expect(find.text('QUICK SARI-SARI PRESETS:'), findsNothing);
+
+    // Tap ₱50 preset chip
+    final chip50 = find.widgetWithText(ActionChip, '₱50 (0.42 kg)');
+    expect(chip50, findsOneWidget);
+    await tester.tap(chip50);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Still on By Amount tab
+    expect(find.text('QUICK PESO AMOUNT PRESETS (HALAGA):'), findsOneWidget);
+    expect(find.text('QUICK SARI-SARI PRESETS:'), findsNothing);
+
+    // Add to cart
+    final addButton = find.widgetWithText(ElevatedButton, 'Add ₱50.00 to Cart');
+    expect(addButton, findsOneWidget);
+    await tester.tap(addButton);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify Red Onion added to Cart with calculated quantity
+    expect(find.text('Red Onion'), findsWidgets);
+
+    await db.close();
+  });
 }
