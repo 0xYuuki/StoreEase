@@ -51,15 +51,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     // Verify all 6 navigation tabs exist
-    expect(find.text('POS'), findsOneWidget);
+    expect(find.text('Cart'), findsOneWidget);
     expect(find.text('Debts'), findsOneWidget);
     expect(find.text('Inventory'), findsOneWidget);
     expect(find.text('Sales'), findsOneWidget);
     expect(find.text('Analytics'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
 
-    // Initial view is POS
-    expect(find.text("Helen's Store POS"), findsOneWidget);
+    // Initial view is Cart
+    expect(find.text("Helen's Store"), findsOneWidget);
     expect(find.byIcon(Icons.camera_alt_outlined), findsOneWidget);
 
     // Tap Debts Tab
@@ -152,8 +152,8 @@ void main() {
     expect(find.text('Inventory Management'), findsOneWidget);
     expect(find.text('Point camera at product barcode'), findsNothing);
 
-    // Switch back to POS tab
-    await tester.tap(find.text('POS'));
+    // Switch back to Cart tab
+    await tester.tap(find.text('Cart'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 

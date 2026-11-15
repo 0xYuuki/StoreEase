@@ -46,7 +46,7 @@ class HelensStoreApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "Helen's Store POS",
+      title: "Helen's Store",
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       home: const HomeShell(),
@@ -95,8 +95,9 @@ class _HomeShellState extends State<HomeShell> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.point_of_sale),
-            label: 'POS',
+            icon: Icon(Icons.shopping_cart_outlined),
+            activeIcon: Icon(Icons.shopping_cart),
+            label: 'Cart',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.account_balance_wallet_outlined),
