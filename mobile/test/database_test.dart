@@ -1,0 +1,211 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:helen_store_mobile/models/models.dart';
+import 'package:helen_store_mobile/services/database_service.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfiNoIsolate;
+  });
+
+  group('DatabaseService SQLite Offline Operations', () {
+    late DatabaseService dbService;
+
+    setUp(() async {
+      dbService = DatabaseService();
+      await dbService.init(customPath: inMemoryDatabasePath);
+    });
+
+    tearDown(() async {
+      await dbService.close();
+    });
+
+    test('Initializes tables and seeds default starter catalog', () async {
+      final products = await dbService.getProducts();
+      expect(products.isNotEmpty, true);
+      expect(products.any((p) => p.name == 'Egg'), true);
+
+      final debtors = await dbService.getDebtors();
+      expect(debtors.isNotEmpty, true);
+      expect(debtors.any((d) => d.name == 'Aling Nena'), true);
+
+      final health = await dbService.checkHealth();
+      expect(health['status'], 'Healthy');
+      expect(health['integrity'], 'ok');
+      expect(health['product_count'] >= 5, true);
+      expect(health['customer_count'] >= 2, true);
+    });
+
+    test('Barcode lookup returns matching active product', () async {
+      final egg = await dbService.lookupBarcode('1');
+      expect(egg, isNotNull);
+      expect(egg!.name, 'Egg');
+      expect(egg.priceCentavos, 1100);
+
+      final hotdog = await dbService.lookupBarcode('333333333331');
+      expect(hotdog, isNotNull);
+      expect(hotdog!.name, 'Hotdog');
+
+      final unknown = await dbService.lookupBarcode('999999999999');
+      expect(unknown, isNull);
+    });
+
+    test('Adjusts product stock and records stock movement audit trail', () async {
+      final egg = (await dbService.lookupBarcode('1'))!;
+      final initialStock = egg.stock ?? 0;
+
+      // Add 10 stock
+      final updated = await dbService.adjustStock(egg.id, 10, 'Delivery');
+      expect(updated.stock, initialStock + 10);
+
+      // Verify stock movement entry
+      final history = await dbService.getStockHistory(egg.id);
+      final entries = history['entries'] as List<StockMovement>;
+      expect(entries.isNotEmpty, true);
+      expect(entries.first.delta, 10);
+      expect(entries.first.reason, 'Delivery');
+      expect(entries.first.resultingStock, initialStock + 10);
+
+      // Reject negative stock resulting
+      expect(
+        () => dbService.adjustStock(egg.id, -(initialStock + 100), 'Large deduction'),
+        throwsException,
+      );
+    });
+
+    test('Completes atomic cash checkout and decrements stock', () async {
+      final egg = (await dbService.lookupBarcode('1'))!;
+      final initialStock = egg.stock!;
+
+      final receipt = await dbService.checkout(
+        items: [CartItem(product: egg, quantity: 2)],
+        tenderedAmount: 5000, // 50.00 pesos (Total is 2200 = 22.00 pesos)
+      );
+
+      expect(receipt.saleId > 0, true);
+      expect(receipt.totalAmount, 2200);
+      expect(receipt.paymentMethod, 'cash');
+      expect(receipt.tenderedAmount, 5000);
+      expect(receipt.changeAmount, 2800); // 5000 - 2200 = 2800
+      expect(receipt.items.length, 1);
+      expect(receipt.items.first.quantity, 2);
+
+      // Stock should have decreased by 2
+      final refreshedEgg = (await dbService.lookupBarcode('1'))!;
+      expect(refreshedEgg.stock, initialStock - 2);
+    });
+
+    test('Completes shortage debt checkout and charges customer', () async {
+      final egg = (await dbService.lookupBarcode('1'))!;
+      final debtors = await dbService.getDebtors();
+      final alingNena = debtors.firstWhere((d) => d.name == 'Aling Nena');
+      final initialBalance = alingNena.currentBalance;
+
+      // Bill is 2 * 1100 = 2200 centavos (22 pesos)
+      // Cash tendered is 1000 centavos (10 pesos) -> Shortage: 1200 centavos (12 pesos)
+      final receipt = await dbService.checkout(
+        items: [CartItem(product: egg, quantity: 2)],
+        tenderedAmount: 1000,
+        debtorId: alingNena.id,
+      );
+
+      expect(receipt.paymentMethod, 'debt');
+      expect(receipt.debtorName, 'Aling Nena');
+      expect(receipt.debtCharged, 1200);
+      expect(receipt.debtBalance, initialBalance + 1200);
+
+      // Customer balance in database must be updated
+      final updatedDebtors = await dbService.getDebtors();
+      final updatedNena = updatedDebtors.firstWhere((d) => d.id == alingNena.id);
+      expect(updatedNena.currentBalance, initialBalance + 1200);
+
+      // Customer transactions ledger must include debt entry
+      final txs = await dbService.getCustomerTransactions(alingNena.id);
+      expect(txs.any((t) => t.type == 'debt' && t.amount == 1200), true);
+    });
+
+    test('Creates new customer on the fly during debt checkout', () async {
+      final egg = (await dbService.lookupBarcode('1'))!;
+
+      final receipt = await dbService.checkout(
+        items: [CartItem(product: egg, quantity: 1)],
+        tenderedAmount: 0, // Fully charged to debt
+        newDebtorName: 'Mang Kanor',
+      );
+
+      expect(receipt.paymentMethod, 'debt');
+      expect(receipt.debtorName, 'Mang Kanor');
+      expect(receipt.debtCharged, 1100);
+      expect(receipt.debtBalance, 1100);
+
+      // Mang Kanor exists in debtors list
+      final debtors = await dbService.getDebtors();
+      final kanor = debtors.firstWhere((d) => d.name == 'Mang Kanor');
+      expect(kanor.currentBalance, 1100);
+      expect(kanor.activeDebt, true);
+    });
+
+    test('Records customer payment and reduces debt balance', () async {
+      final debtors = await dbService.getDebtors();
+      final alingNena = debtors.firstWhere((d) => d.name == 'Aling Nena');
+      final initialBalance = alingNena.currentBalance;
+      expect(initialBalance > 0, true);
+
+      // Pay 10000 centavos (100.00 pesos)
+      final paymentResult = await dbService.recordPayment(
+        alingNena.id,
+        10000,
+        notes: 'Partial cash payment',
+      );
+
+      expect(paymentResult['success'], true);
+      expect(paymentResult['new_balance'], initialBalance - 10000);
+
+      // Verify transaction ledger
+      final txs = await dbService.getCustomerTransactions(alingNena.id);
+      expect(txs.first.type, 'payment');
+      expect(txs.first.amount, 10000);
+      expect(txs.first.resultingBalance, initialBalance - 10000);
+
+      // Rejects payment exceeding debt
+      expect(
+        () => dbService.recordPayment(alingNena.id, 999999999),
+        throwsException,
+      );
+    });
+
+    test('Retrieves sales history and individual receipt details', () async {
+      final egg = (await dbService.lookupBarcode('1'))!;
+      final receipt = await dbService.checkout(
+        items: [CartItem(product: egg, quantity: 3)],
+        tenderedAmount: 5000,
+      );
+
+      final salesData = await dbService.getSales();
+      final sales = salesData['sales'] as List<SalesSummary>;
+      expect(sales.isNotEmpty, true);
+      expect(sales.first.id, receipt.saleId);
+      expect(sales.first.totalAmount, 3300);
+
+      final fetchedReceipt = await dbService.getReceipt(receipt.saleId);
+      expect(fetchedReceipt.saleId, receipt.saleId);
+      expect(fetchedReceipt.totalAmount, 3300);
+      expect(fetchedReceipt.items.length, 1);
+      expect(fetchedReceipt.items.first.quantity, 3);
+    });
+
+    test('Reset to sample data clears and restores initial dataset', () async {
+      // Create extra customer
+      await dbService.createDebtor('Temporary Customer');
+      var debtors = await dbService.getDebtors();
+      expect(debtors.any((d) => d.name == 'Temporary Customer'), true);
+
+      // Reset
+      await dbService.resetToSampleData();
+      debtors = await dbService.getDebtors();
+      expect(debtors.any((d) => d.name == 'Temporary Customer'), false);
+      expect(debtors.any((d) => d.name == 'Aling Nena'), true);
+    });
+  });
+}

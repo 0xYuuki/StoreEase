@@ -8,17 +8,21 @@ import 'screens/pos_screen.dart';
 import 'screens/sales_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/api_service.dart';
+import 'services/database_service.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final database = DatabaseService();
+  await database.init();
   final storage = StorageService();
-  final api = ApiService(storage: storage);
+  final api = ApiService(database: database, storage: storage);
 
   runApp(
     MultiProvider(
       providers: [
+        Provider<DatabaseService>.value(value: database),
         Provider<StorageService>.value(value: storage),
         Provider<ApiService>.value(value: api),
         ChangeNotifierProvider(create: (_) => CartProvider(api: api)),

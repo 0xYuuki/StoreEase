@@ -2,9 +2,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:helen_store_mobile/models/models.dart';
 import 'package:helen_store_mobile/providers/cart_provider.dart';
 import 'package:helen_store_mobile/services/api_service.dart';
+import 'package:helen_store_mobile/services/database_service.dart';
 import 'package:helen_store_mobile/services/storage_service.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
   group('Models & Calculations', () {
     test('Product JSON deserialization and currency conversion', () {
       final json = {
@@ -33,7 +40,8 @@ void main() {
       final p2 = Product(id: 2, barcodeString: '2', name: 'Bread', priceCentavos: 5550);
 
       final storage = StorageService();
-      final api = ApiService(storage: storage);
+      final db = DatabaseService();
+      final api = ApiService(database: db, storage: storage);
       final cart = CartProvider(api: api);
 
       expect(cart.items.isEmpty, true);
