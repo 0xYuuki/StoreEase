@@ -259,6 +259,93 @@ class DatabaseService {
     }
 
     return await db.transaction<Product>((txn) async {
+      // 1. Check if an existing product matches this name (case-insensitive)
+      final existingByName = await txn.rawQuery(
+        'SELECT * FROM Products WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) ORDER BY active DESC, id ASC',
+        [cleanName],
+      );
+
+      if (existingByName.isNotEmpty) {
+        final oldRow = existingByName.first;
+        final oldId = oldRow['id'] as int;
+        final oldName = oldRow['name'] as String;
+        final oldBarcode = oldRow['barcode_string'] as String;
+        final oldStock = (oldRow['stock'] as num?)?.toDouble();
+        final oldUnit = (oldRow['unit'] as String?) ?? 'pc';
+        final oldPricingType = (oldRow['pricing_type'] as String?) ?? 'unit';
+        final oldCategory = (oldRow['category'] as String?) ?? 'General';
+        final oldReorder = (oldRow['reorder_level'] as num?)?.toDouble();
+
+        // Check barcode conflict: if user provided a specific barcode (not PLU auto-generated)
+        String finalBarcode = oldBarcode;
+        bool finalIsBarcodeless = (oldRow['is_barcodeless'] as int? ?? 0) == 1;
+
+        if (cleanBarcode.isNotEmpty && !cleanBarcode.startsWith('PLU-') && cleanBarcode != oldBarcode) {
+          final barcodeConflict = await txn.query(
+            'Products',
+            where: 'barcode_string = ? AND active = ? AND id != ?',
+            whereArgs: [cleanBarcode, 1, oldId],
+          );
+          if (barcodeConflict.isNotEmpty) {
+            throw Exception('Barcode "$cleanBarcode" is already used by "${barcodeConflict.first['name']}"');
+          }
+          finalBarcode = cleanBarcode;
+          finalIsBarcodeless = false;
+        }
+
+        // Calculate resulting stock (adds to existing stock if initialStock was provided)
+        double? resultingStock = oldStock;
+        if (initialStock != null) {
+          final stockDelta = initialStock.toDouble();
+          resultingStock = (oldStock ?? 0.0) + stockDelta;
+
+          final now = DateTime.now().toIso8601String();
+          await txn.insert('StockAdjustments', {
+            'product_id': oldId,
+            'delta': stockDelta,
+            'resulting_stock': resultingStock,
+            'reason': oldStock != null ? 'Restock / Added via Product Entry' : 'Initial Stock',
+            'timestamp': now,
+          });
+        }
+
+        final finalCategory = cleanCategory != 'General' ? cleanCategory : oldCategory;
+        final finalReorder = reorderLevel?.toDouble() ?? oldReorder;
+
+        await txn.update(
+          'Products',
+          {
+            'name': oldName, // Preserve established original display casing
+            'price': priceCentavos,
+            'stock': resultingStock,
+            'reorder_level': finalReorder,
+            'active': 1, // Reactivate if was soft-deleted
+            'category': finalCategory,
+            'pricing_type': cleanPricingType != 'unit' ? cleanPricingType : oldPricingType,
+            'unit': cleanUnit != 'pc' ? cleanUnit : oldUnit,
+            'barcode_string': finalBarcode,
+            'is_barcodeless': finalIsBarcodeless ? 1 : 0,
+          },
+          where: 'id = ?',
+          whereArgs: [oldId],
+        );
+
+        return Product(
+          id: oldId,
+          barcodeString: finalBarcode,
+          name: oldName,
+          priceCentavos: priceCentavos,
+          stock: resultingStock,
+          reorderLevel: finalReorder,
+          active: 1,
+          category: finalCategory,
+          pricingType: cleanPricingType != 'unit' ? cleanPricingType : oldPricingType,
+          unit: cleanUnit != 'pc' ? cleanUnit : oldUnit,
+          isBarcodeless: finalIsBarcodeless,
+        );
+      }
+
+      // 2. New product: verify barcode is not already used
       final existing = await txn.query(
         'Products',
         where: 'barcode_string = ? AND active = ?',

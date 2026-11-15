@@ -524,5 +524,39 @@ void main() {
       expect(() => dbService.deleteProduct(product.id), throwsException);
       expect(() => dbService.deleteProduct(999999), throwsException);
     });
+
+    test('createProduct records to existing product when name differs only by letter case', () async {
+      // Starter catalog already seeds 'Egg' with id 1, price 1100, stock 92, barcode '1'
+      final existingEgg = await dbService.lookupBarcode('1');
+      expect(existingEgg, isNotNull);
+      expect(existingEgg!.name, 'Egg');
+      expect(existingEgg.stock, 92);
+      expect(existingEgg.priceCentavos, 1100);
+
+      // Re-add "egg" in lowercase with price 1200 and initial stock 20
+      final recorded = await dbService.createProduct(
+        name: 'egg', // lowercase
+        priceCentavos: 1200,
+        initialStock: 20,
+      );
+
+      // Must record to existing Egg (same ID)
+      expect(recorded.id, existingEgg.id);
+      expect(recorded.name, 'Egg'); // preserves established display casing
+      expect(recorded.priceCentavos, 1200);
+      expect(recorded.stock, 112); // 92 + 20
+
+      // Catalog has only 1 Egg product (no duplicate)
+      final all = await dbService.getProducts();
+      final eggMatches = all.where((p) => p.name.toLowerCase() == 'egg').toList();
+      expect(eggMatches.length, 1);
+      expect(eggMatches.first.stock, 112);
+      expect(eggMatches.first.priceCentavos, 1200);
+
+      // Stock adjustments audit trail records the addition
+      final history = await dbService.getStockHistory(existingEgg.id);
+      final entries = history['entries'] as List<StockMovement>;
+      expect(entries.any((e) => e.delta == 20 && e.resultingStock == 112), true);
+    });
   });
 }

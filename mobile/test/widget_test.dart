@@ -991,4 +991,88 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('Adding product with similar case-insensitive name records to existing product', (WidgetTester tester) async {
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)),
+        ],
+        child: const MaterialApp(
+          home: HelensStoreApp(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 1. Navigate to Inventory tab
+    await tester.tap(find.text('Inventory'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 2. Open Add Product dialog
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 3. Type "egg" in lowercase into Product Name field
+    final nameField = find.byWidgetPredicate(
+      (w) => w is TextField && (w.decoration?.labelText == 'Product Name'),
+    );
+    await tester.enterText(nameField, 'egg');
+    await tester.pump();
+
+    // Verify helper banner appears indicating match to existing "Egg"
+    expect(find.textContaining('Matches existing "Egg" (92 pcs). Saving will record & restock to it.'), findsOneWidget);
+
+    // Enter Price: 12.00
+    final priceField = find.byWidgetPredicate(
+      (w) => w is TextField && (w.decoration?.labelText?.contains('Price') ?? false),
+    );
+    await tester.enterText(priceField, '12.00');
+    await tester.pump();
+
+    // Enter Initial Stock: 10
+    final stockField = find.byWidgetPredicate(
+      (w) => w is TextField && (w.decoration?.labelText?.contains('Initial Stock') ?? false),
+    );
+    await tester.enterText(stockField, '10');
+    await tester.pump();
+
+    // 4. Tap "Save Product"
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Save Product'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 5. Verify SnackBar confirms recorded to existing product
+    expect(find.text('Recorded to existing product "Egg".'), findsOneWidget);
+
+    // Search for Egg in inventory list to bring it into view
+    final invSearch = find.byWidgetPredicate(
+      (w) => w is TextField && (w.decoration?.hintText?.contains('Search product') ?? false),
+    );
+    await tester.enterText(invSearch, 'Egg');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 6. Verify Egg is updated to 102 pcs and ₱12.00 in inventory list
+    expect(find.text('102 pcs in stock'), findsOneWidget);
+    expect(find.text('₱12.00'), findsOneWidget);
+
+    await db.close();
+  });
 }

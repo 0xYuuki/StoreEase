@@ -109,7 +109,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       return code;
     }
 
-    final saved = await showDialog<bool>(
+    final result = await showDialog<String>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
@@ -154,11 +154,45 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       TextField(
                         controller: nameController,
                         textCapitalization: TextCapitalization.words,
+                        onChanged: (_) => setDialogState(() {}),
                         decoration: const InputDecoration(
                           labelText: 'Product Name',
                           hintText: 'e.g. Orange Juice, Potato Chips...',
                           prefixIcon: Icon(Icons.label_outline),
                         ),
+                      ),
+                      Builder(
+                        builder: (context) {
+                          final currentTyped = nameController.text.trim().toLowerCase();
+                          if (currentTyped.isEmpty) return const SizedBox.shrink();
+                          final prods = context.read<ProductProvider>().products;
+                          final match = prods.cast<Product?>().firstWhere(
+                            (p) => p?.name.trim().toLowerCase() == currentTyped,
+                            orElse: () => null,
+                          );
+                          if (match == null) return const SizedBox.shrink();
+                          return Container(
+                            margin: const EdgeInsets.only(top: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Matches existing "${match.name}" (${match.formattedStock}). Saving will record & restock to it.',
+                                    style: TextStyle(fontSize: 11, color: Colors.blue.shade900, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
@@ -356,7 +390,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
+                  onPressed: () => Navigator.of(ctx).pop(),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
@@ -395,8 +429,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     final messenger = ScaffoldMessenger.of(context);
                     final nav = Navigator.of(ctx);
 
+                    final allProds = productProv.products;
+                    final existingMatch = allProds.cast<Product?>().firstWhere(
+                      (p) => p?.name.trim().toLowerCase() == name.toLowerCase(),
+                      orElse: () => null,
+                    );
+
                     try {
-                      await productProv.createProduct(
+                      final savedProd = await productProv.createProduct(
                         barcodeString: isBarcodeless ? null : barcode,
                         name: name,
                         priceCentavos: priceCentavos,
@@ -407,7 +447,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         unit: unit,
                         isBarcodeless: isBarcodeless,
                       );
-                      nav.pop(true);
+                      nav.pop(existingMatch != null ? 'updated:${existingMatch.name}' : 'created:${savedProd.name}');
                     } catch (e) {
                       messenger.showSnackBar(
                         SnackBar(content: Text('Failed to add product: $e'), backgroundColor: AppTheme.dangerRed),
@@ -423,12 +463,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
       },
     );
 
-    if (saved == true && mounted) {
+    if (result != null && mounted) {
+      final isUpdated = result.startsWith('updated:');
+      final prodName = result.substring(8);
+      final msg = isUpdated
+          ? 'Recorded to existing product "$prodName".'
+          : 'Product "$prodName" added successfully!';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Product "${nameController.text.trim()}" added successfully!'),
+          content: Text(msg),
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(milliseconds: 1500),
+          duration: const Duration(milliseconds: 2000),
         ),
       );
     }
