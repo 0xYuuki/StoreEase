@@ -194,6 +194,7 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
     final tenderedText = _tenderedController.text.trim();
     final tenderedPesos = double.tryParse(tenderedText) ?? 0.0;
     final tenderedCentavos = (tenderedPesos * 100).round();
+    final soldProductIds = cart.items.map((i) => i.product.id).toSet();
 
     // Shortage check:
     if (tenderedCentavos < cart.totalCentavos) {
@@ -218,13 +219,16 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
           }
           _tenderedController.clear();
           debtProv.loadDebts();
-          productProv.loadProducts();
-          context.read<SalesProvider>().loadSales();
-          context.read<AnalyticsProvider>().loadAnalytics();
-          await AppDialogs.showReceiptDialog(context, receipt);
+          await productProv.loadProducts();
           if (mounted) {
             context.read<SalesProvider>().loadSales();
             context.read<AnalyticsProvider>().loadAnalytics();
+            await AppDialogs.showReceiptDialog(context, receipt);
+            if (mounted) {
+              context.read<SalesProvider>().loadSales();
+              context.read<AnalyticsProvider>().loadAnalytics();
+              _checkAndShowLowStockAlert(soldProductIds);
+            }
           }
         }
       } catch (e) {
@@ -245,13 +249,16 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
             setState(() => _showScanner = false);
           }
           _tenderedController.clear();
-          productProv.loadProducts();
-          context.read<SalesProvider>().loadSales();
-          context.read<AnalyticsProvider>().loadAnalytics();
-          await AppDialogs.showReceiptDialog(context, receipt);
+          await productProv.loadProducts();
           if (mounted) {
             context.read<SalesProvider>().loadSales();
             context.read<AnalyticsProvider>().loadAnalytics();
+            await AppDialogs.showReceiptDialog(context, receipt);
+            if (mounted) {
+              context.read<SalesProvider>().loadSales();
+              context.read<AnalyticsProvider>().loadAnalytics();
+              _checkAndShowLowStockAlert(soldProductIds);
+            }
           }
         }
       } catch (e) {
@@ -261,6 +268,37 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
           );
         }
       }
+    }
+  }
+
+  void _checkAndShowLowStockAlert(Set<int> soldProductIds) {
+    if (!mounted) return;
+    final productProv = context.read<ProductProvider>();
+    final lowItems = productProv.getLowStockItemsByIds(soldProductIds);
+    if (lowItems.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.dangerRed,
+          duration: const Duration(seconds: 4),
+          content: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Low Stock Alert: ${lowItems.map((p) => "${p.name} (${p.formattedStock})").join(", ")}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          action: SnackBarAction(
+            label: 'View Alerts',
+            textColor: Colors.yellow,
+            onPressed: () => AppDialogs.showStockAlertsModal(context),
+          ),
+        ),
+      );
     }
   }
 
@@ -299,6 +337,15 @@ class _PosScreenState extends State<PosScreen> with WidgetsBindingObserver {
           ],
         ),
         actions: [
+          IconButton(
+            icon: Badge(
+              isLabelVisible: productProv.lowStockCount > 0,
+              label: Text('${productProv.lowStockCount}'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            tooltip: 'Stock Alerts & Reorder',
+            onPressed: () => AppDialogs.showStockAlertsModal(context),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh Products',

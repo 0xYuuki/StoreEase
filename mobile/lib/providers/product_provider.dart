@@ -14,6 +14,45 @@ class ProductProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  List<Product> get lowStockProducts => _products.where((p) => p.isLowStock && p.active == 1).toList();
+  int get lowStockCount => lowStockProducts.length;
+
+  List<Product> getLowStockItemsByIds(Iterable<int> productIds) {
+    final ids = productIds.toSet();
+    return _products.where((p) => ids.contains(p.id) && p.isLowStock && p.active == 1).toList();
+  }
+
+  String generateShoppingListText() {
+    final lowItems = lowStockProducts;
+    if (lowItems.isEmpty) return "All stocks are healthy! No products currently below reorder levels.";
+
+    final buffer = StringBuffer();
+    buffer.writeln("🛒 Helen's Store — Restock / Shopping List");
+    buffer.writeln("Date: ${DateTime.now().toLocal().toString().split(' ')[0]}");
+    buffer.writeln();
+
+    // Group by category
+    final Map<String, List<Product>> byCategory = {};
+    for (final item in lowItems) {
+      final cat = item.category.trim().isEmpty ? 'General' : item.category.trim();
+      byCategory.putIfAbsent(cat, () => []).add(item);
+    }
+
+    final sortedKeys = byCategory.keys.toList()..sort();
+    for (final cat in sortedKeys) {
+      buffer.writeln("[$cat]");
+      for (final p in byCategory[cat]!) {
+        final alertText = p.reorderLevel != null
+            ? (p.isWeighted ? '${p.reorderLevel} ${p.unit}' : '${p.reorderLevel!.toInt()} pcs')
+            : 'N/A';
+        buffer.writeln("• ${p.name} (Stock: ${p.formattedStock} | Alert Level: $alertText)");
+      }
+      buffer.writeln();
+    }
+    buffer.writeln("Total items to restock: ${lowItems.length}");
+    return buffer.toString().trim();
+  }
+
   Future<void> loadProducts() async {
     _isLoading = true;
     _errorMessage = null;

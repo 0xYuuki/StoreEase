@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../models/models.dart';
+import '../providers/product_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 
@@ -636,6 +639,123 @@ class AppDialogs {
       ),
     );
   }
+
+  // 7. Adjust Stock Dialog
+  static Future<bool?> showAdjustStockDialog(BuildContext context, Product product) async {
+    final deltaController = TextEditingController();
+    final reasonController = TextEditingController();
+    bool isAddition = true;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text('Adjust Stock · ${product.name}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Current Stock: ${product.stock != null ? product.formattedStock : 'Untracked'}',
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Add Stock (+)'),
+                          selected: isAddition,
+                          selectedColor: AppTheme.primaryLight,
+                          onSelected: (val) => setState(() => isAddition = true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Deduct Stock (-)'),
+                          selected: !isAddition,
+                          selectedColor: AppTheme.dangerLight,
+                          onSelected: (val) => setState(() => isAddition = false),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: deltaController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Quantity to ${isAddition ? 'Add' : 'Deduct'} (${product.isWeighted ? product.unit : 'pcs'})',
+                      prefixIcon: Icon(isAddition ? Icons.add_circle_outline : Icons.remove_circle_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: reasonController,
+                    decoration: const InputDecoration(
+                      labelText: 'Reason for Adjustment',
+                      hintText: 'e.g. Delivery, Spoiled, Restock...',
+                      prefixIcon: Icon(Icons.edit_note),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isAddition ? AppTheme.primaryGreen : AppTheme.dangerRed,
+                  ),
+                  onPressed: () async {
+                    final qty = double.tryParse(deltaController.text.trim()) ?? 0;
+                    if (qty <= 0) return;
+
+                    final reason = reasonController.text.trim().isNotEmpty
+                        ? reasonController.text.trim()
+                        : (isAddition ? 'Restock / Stock In' : 'Stock Out');
+                    final delta = isAddition ? qty : -qty;
+                    final productProv = context.read<ProductProvider>();
+                    final nav = Navigator.of(ctx);
+                    final messenger = ScaffoldMessenger.of(context);
+
+                    try {
+                      await productProv.adjustStock(product.id, delta, reason);
+                      nav.pop(true);
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text('Failed to adjust stock: $e'), backgroundColor: AppTheme.dangerRed),
+                      );
+                    }
+                  },
+                  child: const Text('Save Adjustment', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    return result;
+  }
+
+  // 8. Stock Alerts & Reorder Center Modal
+  static Future<void> showStockAlertsModal(BuildContext context) async {
+    return await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const _StockAlertsSheet(),
+    );
+  }
 }
 
 class _WeightEntrySheet extends StatefulWidget {
@@ -1049,6 +1169,239 @@ class _WeightEntrySheetState extends State<_WeightEntrySheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StockAlertsSheet extends StatelessWidget {
+  const _StockAlertsSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final productProv = context.watch<ProductProvider>();
+    final lowStockItems = productProv.lowStockProducts;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Header Row
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: lowStockItems.isNotEmpty ? AppTheme.dangerLight : AppTheme.primaryLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  lowStockItems.isNotEmpty ? Icons.notifications_active : Icons.check_circle_outline,
+                  color: lowStockItems.isNotEmpty ? AppTheme.dangerRed : AppTheme.primaryGreen,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Stock Alerts & Reorder Center',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      lowStockItems.isNotEmpty
+                          ? '${lowStockItems.length} product(s) below reorder levels'
+                          : 'All catalog stocks are healthy',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: lowStockItems.isNotEmpty ? AppTheme.dangerRed : AppTheme.primaryDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (lowStockItems.isNotEmpty)
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  icon: const Icon(Icons.copy, size: 14),
+                  label: const Text('Copy List'),
+                  onPressed: () async {
+                    final text = productProv.generateShoppingListText();
+                    try {
+                      await Clipboard.setData(ClipboardData(text: text));
+                    } catch (_) {}
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Row(
+                            children: [
+                              Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text('Shopping list copied to clipboard! Ready to share via SMS or Messenger.'),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: AppTheme.primaryGreen,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  },
+                ),
+            ],
+          ),
+          const Divider(height: 24),
+
+          // Items Content
+          if (lowStockItems.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 36),
+              child: Center(
+                child: Column(
+                  children: const [
+                    Icon(Icons.inventory_outlined, color: AppTheme.primaryGreen, size: 48),
+                    SizedBox(height: 12),
+                    Text(
+                      'No Low Stock Products',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'All inventory items have sufficient stock levels.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: lowStockItems.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final p = lowStockItems[index];
+                  final isZero = (p.stock ?? 0) <= 0;
+
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: isZero ? AppTheme.dangerLight.withValues(alpha: 0.3) : Colors.white,
+                      border: Border.all(
+                        color: isZero ? AppTheme.dangerRed.withValues(alpha: 0.4) : Colors.grey.shade200,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                p.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                p.category.toUpperCase(),
+                                style: const TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isZero ? AppTheme.dangerRed : AppTheme.dangerLight,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      isZero ? 'Out of Stock (0)' : 'Stock: ${p.formattedStock}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: isZero ? Colors.white : AppTheme.dangerRed,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Alert at: ${p.reorderLevel != null ? (p.isWeighted ? "${p.reorderLevel} ${p.unit}" : "${p.reorderLevel!.toInt()} pcs") : "N/A"}',
+                                    style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryLight,
+                            foregroundColor: AppTheme.primaryDark,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('Restock', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () async {
+                            await AppDialogs.showAdjustStockDialog(context, p);
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 16),
+
+          // Bottom Close Button
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ),
+        ],
       ),
     );
   }

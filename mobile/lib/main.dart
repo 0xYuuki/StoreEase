@@ -66,6 +66,8 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final lowStockCount = context.watch<ProductProvider>().lowStockCount;
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -93,30 +95,39 @@ class _HomeShellState extends State<HomeShell> {
             context.read<AnalyticsProvider>().loadAnalytics();
           }
         },
-        items: const [
-          BottomNavigationBarItem(
+        items: [
+          const BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart_outlined),
             activeIcon: Icon(Icons.shopping_cart),
             label: 'Cart',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.account_balance_wallet_outlined),
             label: 'Debts',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
+            icon: Badge(
+              isLabelVisible: lowStockCount > 0,
+              label: Text('$lowStockCount'),
+              child: const Icon(Icons.inventory_2_outlined),
+            ),
+            activeIcon: Badge(
+              isLabelVisible: lowStockCount > 0,
+              label: Text('$lowStockCount'),
+              child: const Icon(Icons.inventory_2),
+            ),
             label: 'Inventory',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long_outlined),
             label: 'Sales',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.analytics_outlined),
             activeIcon: Icon(Icons.analytics),
             label: 'Analytics',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),
             label: 'Settings',
           ),

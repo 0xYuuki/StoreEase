@@ -17,6 +17,7 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'All';
+  bool _filterLowStockOnly = false;
 
   static const List<String> _standardCategories = [
     'Beverages',
@@ -546,13 +547,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final isLoading = productProv.isLoading;
 
     final query = _searchController.text.trim().toLowerCase();
-    final matchingSearch = query.isEmpty
-        ? allProducts
-        : allProducts.where((p) {
-            final name = p.name.trim().toLowerCase();
-            final barcode = p.barcodeString.trim().toLowerCase();
-            return name.startsWith(query) || barcode.startsWith(query);
-          }).toList();
+    final matchingSearch = allProducts.where((p) {
+      if (_filterLowStockOnly && !p.isLowStock) return false;
+      if (query.isEmpty) return true;
+      final name = p.name.trim().toLowerCase();
+      final barcode = p.barcodeString.trim().toLowerCase();
+      return name.startsWith(query) || barcode.startsWith(query);
+    }).toList();
 
     // Distinct categories present in inventory
     final Set<String> categoriesSet = {};
@@ -584,12 +585,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
       }
     }
 
-    final hasActiveFilter = query.isNotEmpty || _selectedCategory != 'All';
+    final hasActiveFilter = query.isNotEmpty || _selectedCategory != 'All' || _filterLowStockOnly;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Inventory Management'),
         actions: [
+          IconButton(
+            icon: Badge(
+              isLabelVisible: productProv.lowStockCount > 0,
+              label: Text('${productProv.lowStockCount}'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            tooltip: 'Stock Alerts & Reorder',
+            onPressed: () => AppDialogs.showStockAlertsModal(context),
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Add Product',
@@ -633,60 +643,88 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
 
-          // 2. Category Filter Chips
-          if (sortedCategories.isNotEmpty)
+          // 2. Category Filter Chips & Low Stock Alert Quick Filter
+          if (sortedCategories.isNotEmpty || productProv.lowStockCount > 0)
             SizedBox(
               height: 48,
-              child: ListView.separated(
+              child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: sortedCategories.length + 1,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    final isSelected = _selectedCategory == 'All';
-                    return FilterChip(
-                      selected: isSelected,
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      label: Text('All (${matchingSearch.length})'),
-                      selectedColor: AppTheme.primaryLight,
-                      checkmarkColor: AppTheme.primaryDark,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? AppTheme.primaryDark : AppTheme.textDark,
-                      ),
-                      onSelected: (_) => setState(() => _selectedCategory = 'All'),
-                    );
-                  }
-
-                  final cat = sortedCategories[index - 1];
-                  final isSelected = _selectedCategory.toLowerCase() == cat.toLowerCase();
-                  final count = matchingSearch
-                      .where((p) => p.category.trim().toLowerCase() == cat.toLowerCase())
-                      .length;
-
-                  return FilterChip(
-                    selected: isSelected,
+                children: [
+                  FilterChip(
+                    selected: _selectedCategory == 'All' && !_filterLowStockOnly,
                     visualDensity: VisualDensity.compact,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    avatar: Icon(
-                      _categoryIconData(cat),
-                      size: 16,
-                      color: isSelected ? AppTheme.primaryDark : AppTheme.textMuted,
-                    ),
-                    label: Text('$cat ($count)'),
+                    label: Text('All (${allProducts.length})'),
                     selectedColor: AppTheme.primaryLight,
                     checkmarkColor: AppTheme.primaryDark,
                     labelStyle: TextStyle(
                       fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? AppTheme.primaryDark : AppTheme.textDark,
+                      fontWeight: (_selectedCategory == 'All' && !_filterLowStockOnly) ? FontWeight.bold : FontWeight.normal,
+                      color: (_selectedCategory == 'All' && !_filterLowStockOnly) ? AppTheme.primaryDark : AppTheme.textDark,
                     ),
-                    onSelected: (_) => setState(() => _selectedCategory = cat),
-                  );
-                },
+                    onSelected: (_) => setState(() {
+                      _selectedCategory = 'All';
+                      _filterLowStockOnly = false;
+                    }),
+                  ),
+                  const SizedBox(width: 8),
+
+                  if (productProv.lowStockCount > 0) ...[
+                    FilterChip(
+                      selected: _filterLowStockOnly,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      avatar: const Icon(Icons.warning_amber_rounded, size: 16, color: AppTheme.dangerRed),
+                      label: Text('Low Stock (${productProv.lowStockCount})'),
+                      selectedColor: AppTheme.dangerLight,
+                      checkmarkColor: AppTheme.dangerRed,
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _filterLowStockOnly ? AppTheme.dangerRed : AppTheme.textDark,
+                      ),
+                      onSelected: (val) => setState(() {
+                        _filterLowStockOnly = val;
+                        if (val) _selectedCategory = 'All';
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+
+                  ...sortedCategories.map((cat) {
+                    final isSelected = !_filterLowStockOnly && _selectedCategory.toLowerCase() == cat.toLowerCase();
+                    final count = allProducts
+                        .where((p) => p.category.trim().toLowerCase() == cat.toLowerCase())
+                        .length;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        selected: isSelected,
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        avatar: Icon(
+                          _categoryIconData(cat),
+                          size: 16,
+                          color: isSelected ? AppTheme.primaryDark : AppTheme.textMuted,
+                        ),
+                        label: Text('$cat ($count)'),
+                        selectedColor: AppTheme.primaryLight,
+                        checkmarkColor: AppTheme.primaryDark,
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? AppTheme.primaryDark : AppTheme.textDark,
+                        ),
+                        onSelected: (_) => setState(() {
+                          _selectedCategory = cat;
+                          _filterLowStockOnly = false;
+                        }),
+                      ),
+                    );
+                  }),
+                ],
               ),
             ),
 

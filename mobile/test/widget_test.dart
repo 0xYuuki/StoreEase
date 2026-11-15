@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:helen_store_mobile/main.dart';
 import 'package:helen_store_mobile/models/models.dart';
@@ -782,6 +783,106 @@ void main() {
 
     // Verify Red Onion added to Cart with calculated quantity
     expect(find.text('Red Onion'), findsWidgets);
+
+    await db.close();
+  });
+
+  testWidgets('Notification Bell, Badge, and Stock Alerts & Reorder Center Modal function reactively', (WidgetTester tester) async {
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (MethodCall methodCall) async {
+        return null;
+      },
+    );
+
+    final db = DatabaseService();
+    await db.init(customPath: inMemoryDatabasePath);
+    final storage = StorageService();
+    final api = ApiService(database: db, storage: storage);
+
+    // Seed low stock item
+    await db.createProduct(
+      name: 'Magic Sarap 8g',
+      priceCentavos: 500,
+      initialStock: 2,
+      reorderLevel: 10,
+      category: 'Condiments & Cooking',
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<DatabaseService>.value(value: db),
+          Provider<StorageService>.value(value: storage),
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider(create: (_) => ProductProvider(api: api)..loadProducts()),
+          ChangeNotifierProvider(create: (_) => CartProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => DebtProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => SalesProvider(api: api)),
+          ChangeNotifierProvider(create: (_) => AnalyticsProvider(api: api)),
+        ],
+        child: const HelensStoreApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify Notification Bell exists and has badge count '1'
+    expect(find.byTooltip('Stock Alerts & Reorder'), findsOneWidget);
+    expect(find.text('1'), findsWidgets); // on bell and inventory tab
+
+    // Tap Notification Bell to open Stock Alerts & Reorder Center
+    await tester.tap(find.byTooltip('Stock Alerts & Reorder'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify modal opened
+    expect(find.text('Stock Alerts & Reorder Center'), findsOneWidget);
+    expect(find.text('Magic Sarap 8g'), findsOneWidget);
+    expect(find.text('Stock: 2 pcs'), findsOneWidget);
+
+    // Tap Copy List button
+    await tester.tap(find.text('Copy List'));
+    await tester.idle();
+    await tester.pumpAndSettle();
+
+    // Verify snackbar appears
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text('Shopping list copied to clipboard! Ready to share via SMS or Messenger.'), findsOneWidget);
+
+    // Tap Restock button on the item card
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Restock'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Verify Adjust Stock dialog opened
+    expect(find.textContaining('Adjust Stock · Magic Sarap 8g'), findsOneWidget);
+
+    // Enter 20 to add
+    final qtyField = find.byWidgetPredicate(
+      (w) => w is TextField && (w.decoration?.labelText?.contains('Quantity to') ?? false),
+    );
+    await tester.enterText(qtyField, '20');
+    await tester.pump();
+
+    // Tap Save Adjustment
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Save Adjustment'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Modal updates reactively: all stocks healthy!
+    expect(find.text('All catalog stocks are healthy'), findsOneWidget);
+    expect(find.text('No Low Stock Products'), findsOneWidget);
+
+    // Close modal
+    await tester.tap(find.text('Close'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Navigate to Inventory tab and verify Low Stock filter
+    await tester.tap(find.text('Inventory'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
     await db.close();
   });

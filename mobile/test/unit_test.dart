@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:helen_store_mobile/models/models.dart';
 import 'package:helen_store_mobile/providers/cart_provider.dart';
+import 'package:helen_store_mobile/providers/product_provider.dart';
 import 'package:helen_store_mobile/services/api_service.dart';
 import 'package:helen_store_mobile/services/database_service.dart';
 import 'package:helen_store_mobile/services/storage_service.dart';
@@ -275,6 +276,58 @@ void main() {
       expect(saleItem.isWeighted, true);
       expect(saleItem.formattedQuantityOrWeight, '0.50 kg');
       expect(saleItem.lineTotalPesos, 26.0);
+    });
+
+    test('ProductProvider calculates low stock items and generates formatted shopping list', () async {
+      final db = DatabaseService();
+      await db.init(customPath: inMemoryDatabasePath);
+      final storage = StorageService();
+      final api = ApiService(database: db, storage: storage);
+      final productProv = ProductProvider(api: api);
+
+      // Create products: 2 low stock, 1 healthy
+      final p1 = await productProv.createProduct(
+        name: 'Lucky Me! Pancit Canton',
+        priceCentavos: 1500,
+        initialStock: 3,
+        reorderLevel: 10,
+        category: 'Instant Noodles & Snacks',
+      );
+      final p2 = await productProv.createProduct(
+        name: 'Red Onion',
+        priceCentavos: 12000,
+        initialStock: 0.5,
+        reorderLevel: 5.0,
+        category: 'Fresh & Grocery',
+        pricingType: 'weight',
+        unit: 'kg',
+        isBarcodeless: true,
+      );
+      await productProv.createProduct(
+        name: 'Coca-Cola 1.5L',
+        priceCentavos: 7500,
+        initialStock: 24,
+        reorderLevel: 6,
+        category: 'Beverages',
+      );
+
+      expect(productProv.lowStockCount, 2);
+      expect(productProv.lowStockProducts.map((p) => p.name), containsAll(['Lucky Me! Pancit Canton', 'Red Onion']));
+
+      // Test getLowStockItemsByIds
+      final lowItems = productProv.getLowStockItemsByIds([p1.id, p2.id]);
+      expect(lowItems.length, 2);
+
+      // Test shopping list generation
+      final listText = productProv.generateShoppingListText();
+      expect(listText, contains("Helen's Store — Restock / Shopping List"));
+      expect(listText, contains("[Instant Noodles & Snacks]"));
+      expect(listText, contains("Lucky Me! Pancit Canton"));
+      expect(listText, contains("[Fresh & Grocery]"));
+      expect(listText, contains("Red Onion"));
+      expect(listText, contains("Total items to restock: 2"));
+
+      await db.close();
     });
   });
 }
