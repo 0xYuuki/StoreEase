@@ -366,17 +366,16 @@ void main() {
         debtorId: alingNena.id,
       );
 
-      // 1. Search by exact receipt ID
+      // 1. Search by exact receipt ID (e.g. searching '1' only returns sale #1, not others)
       final resId = await dbService.getSales(search: '${receipt1.saleId}');
       final salesId = resId['sales'] as List<SalesSummary>;
-      expect(salesId.any((s) => s.id == receipt1.saleId), true);
-      expect(salesId.any((s) => s.id == receipt2.saleId), false);
+      expect(salesId.length, 1);
+      expect(salesId.first.id, receipt1.saleId);
 
-      // 2. Search by product name
+      // 2. Searching item names no longer matches (items removed from search)
       final resItem = await dbService.getSales(search: 'Pilsen');
       final salesItem = resItem['sales'] as List<SalesSummary>;
-      expect(salesItem.any((s) => s.id == receipt2.saleId), true);
-      expect(salesItem.any((s) => s.id == receipt1.saleId), false);
+      expect(salesItem.isEmpty, true);
 
       // 3. Search by customer name
       final resCustomer = await dbService.getSales(search: 'Aling Nena');

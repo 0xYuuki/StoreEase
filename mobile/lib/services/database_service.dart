@@ -697,17 +697,17 @@ class DatabaseService {
     }
 
     if (search != null && search.trim().isNotEmpty) {
-      final clean = search.trim().replaceAll('#', '');
-      conditions.add('''
-        (
-          CAST(s.id AS TEXT) LIKE ? OR
-          c.name LIKE ? OR
-          s.payment_type LIKE ? OR
-          s.id IN (SELECT sale_id FROM SaleItems WHERE product_name LIKE ?)
-        )
-      ''');
-      final pattern = '%$clean%';
-      whereArgs.addAll([pattern, pattern, pattern, pattern]);
+      final clean = search.trim().replaceAll('#', '').trim();
+      final saleId = int.tryParse(clean);
+      if (saleId != null) {
+        // Exact receipt number matching (e.g. searching '1' only returns sale #1)
+        conditions.add('(s.id = ? OR c.name LIKE ?)');
+        whereArgs.addAll([saleId, '%$clean%']);
+      } else {
+        // Text search: matches customer name only (items removed as requested)
+        conditions.add('c.name LIKE ?');
+        whereArgs.add('%$clean%');
+      }
     }
 
     final whereClause = conditions.isEmpty ? '' : 'WHERE ${conditions.join(' AND ')}';

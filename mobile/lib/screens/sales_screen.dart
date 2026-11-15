@@ -167,7 +167,7 @@ class _SalesScreenState extends State<SalesScreen> {
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
-                      hintText: 'Search receipt #, item, or customer...',
+                      hintText: 'Search by receipt # or customer name...',
                       prefixIcon: const Icon(Icons.search, size: 20),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       suffixIcon: _searchController.text.isNotEmpty

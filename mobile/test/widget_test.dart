@@ -258,12 +258,18 @@ void main() {
     expect(find.text('Sale #1'), findsOneWidget);
     expect(find.text('1 sale • Total: ₱22.00'), findsOneWidget);
 
-    // Type query matching sale
-    final salesSearch = find.widgetWithText(TextField, 'Search receipt #, item, or customer...');
-    await tester.enterText(salesSearch, 'Egg');
+    // Search by receipt ID '1' -> only Sale #1 appears
+    final salesSearch = find.widgetWithText(TextField, 'Search by receipt # or customer name...');
+    await tester.enterText(salesSearch, '1');
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('Sale #1'), findsOneWidget);
+
+    // Searching item names no longer matches (items removed from receipt search)
+    await tester.enterText(salesSearch, 'Egg');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Sale #1'), findsNothing);
 
     // Type query not matching
     await tester.enterText(salesSearch, 'NonExistentItem');
