@@ -43,6 +43,7 @@ dependencies:
   sqflite: ^2.4.6
   path: ^1.9.1
   sqflite_common_ffi: ^2.4.7
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +69,7 @@ flutter:
 
   assets:
     - assets/logo.png
+    - assets/beep.wav
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

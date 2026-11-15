@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../providers/cart_provider.dart';
 import '../providers/debt_provider.dart';
 import '../providers/product_provider.dart';
+import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_dialogs.dart';
 
@@ -19,6 +21,12 @@ class _PosScreenState extends State<PosScreen> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _tenderedController = TextEditingController();
   bool _showScanner = false;
+
+  // Barcode scan throttling & interval control
+  DateTime? _lastScanTime;
+  bool _isScanCooldown = false;
+  String? _lastScannedProductName;
+  static const Duration _scanCooldown = Duration(milliseconds: 1500); // 1.5 second interval to ensure 1 count per scan
 
   @override
   void initState() {
@@ -36,10 +44,21 @@ class _PosScreenState extends State<PosScreen> {
     super.dispose();
   }
 
-  Future<void> _onBarcodeScanned(String barcode) async {
-    final clean = barcode.trim();
+  void _handleBarcodeDetect(String rawBarcode) {
+    final clean = rawBarcode.trim();
     if (clean.isEmpty) return;
 
+    final now = DateTime.now();
+    // Enforce 1.5s interval to ensure each physical scan counts as exactly 1 item
+    if (_lastScanTime != null && now.difference(_lastScanTime!) < _scanCooldown) {
+      return;
+    }
+    _lastScanTime = now;
+
+    _onBarcodeScanned(clean);
+  }
+
+  Future<void> _onBarcodeScanned(String clean) async {
     final productProv = context.read<ProductProvider>();
     final product = await productProv.lookupBarcode(clean);
 
@@ -47,17 +66,47 @@ class _PosScreenState extends State<PosScreen> {
 
     if (product != null) {
       context.read<CartProvider>().addProduct(product);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Added ${product.name} to cart'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+
+      // Play retail scanner beep audio + haptic vibration + system click
+      await AudioService.playScanBeep();
+
+      if (mounted) {
+        setState(() {
+          _isScanCooldown = true;
+          _lastScannedProductName = product.name;
+        });
+
+        Future.delayed(const Duration(milliseconds: 700), () {
+          if (mounted) {
+            setState(() {
+              _isScanCooldown = false;
+            });
+          }
+        });
+
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Scanned: ${product.name} (+1 in cart)')),
+              ],
+            ),
+            backgroundColor: AppTheme.primaryDark,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
     } else {
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No product found for barcode: $clean'),
           backgroundColor: AppTheme.dangerRed,
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -191,29 +240,41 @@ class _PosScreenState extends State<PosScreen> {
                     onDetect: (capture) {
                       final barcodes = capture.barcodes;
                       if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
-                        _onBarcodeScanned(barcodes.first.rawValue!);
+                        _handleBarcodeDetect(barcodes.first.rawValue!);
                       }
                     },
                   ),
-                  Container(
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
                     width: 220,
                     height: 120,
                     decoration: BoxDecoration(
-                      border: Border.all(color: AppTheme.accentGreen, width: 2),
+                      border: Border.all(
+                        color: _isScanCooldown ? Colors.greenAccent : AppTheme.accentGreen,
+                        width: _isScanCooldown ? 4 : 2,
+                      ),
                       borderRadius: BorderRadius.circular(12),
+                      color: _isScanCooldown ? Colors.green.withValues(alpha: 0.15) : Colors.transparent,
                     ),
+                    child: _isScanCooldown
+                        ? const Center(
+                            child: Icon(Icons.check_circle, color: Colors.greenAccent, size: 40),
+                          )
+                        : null,
                   ),
                   Positioned(
                     bottom: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.black54,
+                        color: _isScanCooldown ? AppTheme.primaryDark : Colors.black54,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Text(
-                        'Point camera at product barcode',
-                        style: TextStyle(color: Colors.white, fontSize: 11),
+                      child: Text(
+                        _isScanCooldown && _lastScannedProductName != null
+                            ? '✓ Scanned: $_lastScannedProductName (+1)'
+                            : 'Point camera at product barcode',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -257,7 +318,10 @@ class _PosScreenState extends State<PosScreen> {
                   return ActionChip(
                     avatar: const Icon(Icons.add, size: 16),
                     label: Text('${p.name} (${p.formattedPrice})'),
-                    onPressed: () => cart.addProduct(p),
+                    onPressed: () {
+                      AudioService.playScanBeep();
+                      cart.addProduct(p);
+                    },
                   );
                 },
               ),
